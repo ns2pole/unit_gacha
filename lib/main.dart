@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -110,7 +111,7 @@ class _InitialPageState extends State<_InitialPage> {
       
       if (mounted) {
         setState(() {
-          _showTutorial = !tutorialCompleted;
+          _showTutorial = !kIsWeb && !tutorialCompleted;
           _isLoading = false;
         });
       }
