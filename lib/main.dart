@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -14,6 +16,54 @@ import 'firebase_options.dart';
 
 // 共有の navigatorKey を1つだけ作る
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
+/// これ未満なら「スマホ実機 or 狭いウィンドウ」とみなしブラウザのビューポートをそのまま使う。
+const double _kWebUseNativeViewportShortestSide = 560;
+
+/// 大画面 Web でレイアウトを寄せるときの論理幅（iPhone 12/13/14 付近）。
+const double _kWebPhoneLayoutWidth = 390;
+
+/// Web だけ: 実機スマホは端末の縦横比のまま。幅が十分あるときは中央に典型スマホ幅で表示し、
+/// [MediaQuery.size] をその幅に合わせてネイティブのスマホ版に近い折り返しにする。
+Widget _webResponsiveBuilder(BuildContext context, Widget? child) {
+  if (!kIsWeb || child == null) return child ?? const SizedBox.shrink();
+
+  final data = MediaQuery.of(context);
+  final size = data.size;
+  final shortest = math.min(size.width, size.height);
+
+  if (shortest < _kWebUseNativeViewportShortestSide) {
+    return child;
+  }
+
+  final targetW = math.min(_kWebPhoneLayoutWidth, size.width);
+  return ColoredBox(
+    color: Colors.grey.shade400,
+    child: Center(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: targetW,
+          height: size.height,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x66000000),
+                blurRadius: 24,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+          child: MediaQuery(
+            data: data.copyWith(size: Size(targetW, size.height)),
+            child: child,
+          ),
+        ),
+      ),
+    ),
+  );
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -81,6 +131,7 @@ class UnitGachaApp extends StatelessWidget {
         return AppLocale.resolve(locale);
       },
       navigatorKey: appNavigatorKey,
+      builder: _webResponsiveBuilder,
       home: const _InitialPage(),
     );
   }
