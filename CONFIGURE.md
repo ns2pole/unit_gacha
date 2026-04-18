@@ -2,6 +2,8 @@
 
 This repository does not store Firebase plist/json API keys or RevenueCat SDK keys in Git.
 
+Files matched by [`.gitignore`](.gitignore) (e.g. `google-services.json`, `GoogleService-Info.plist`, `assets/*.key`, keystores, `.env`) must stay local only; `git add -A` will not stage them.
+
 ## Firebase (Android / iOS)
 
 1. Download `google-services.json` and `GoogleService-Info.plist` from the Firebase console.
