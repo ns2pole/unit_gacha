@@ -1,0 +1,111 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+fastlane/build/
+
+# Bundler / Ruby
+vendor/bundle/
+.bundle/
+Gemfile.lock
+
+# App Store Connect API Keys
+.appstoreconnect/
+*.p8
+
+# Fastlane / Google Play service account keys (DO NOT COMMIT)
+fastlane/*.json
+*_key.json
+*_keys.json
+
+# Android signing (DO NOT COMMIT)
+/android/key.properties
+*.jks
+
+# Distribution artifacts
+Runner.ipa
+*.ipa
+*.dSYM.zip
+*.app
+
+# Firebase & Google (real config only; commit *.example templates)
+**/google-services.json
+!**/google-services.json.example
+**/GoogleService-Info.plist
+!**/GoogleService-Info.plist.example
+ios/Runner/GoogleService-Info-*.plist
+
+# Google Cloud / Play / CI service accounts
+**/serviceAccount*.json
+**/*-firebase-adminsdk-*.json
+**/play-console*.json
+
+# Keys, keystores, signing material (asset encryption keys, etc.)
+*.pem
+*.p12
+*.keystore
+*.jks
+*.mobileprovision
+assets/**/*.key
+assets/*.key
+
+# Firebase CLI local
+.firebase/
+
+# Firebase Functions
+/functions/node_modules/
+
+# Local secrets / env
+.env
+.env.*
+!.env.example
+
+# Optional: local dart-define bundle (see CONFIGURE.md)
+/dart_defines.json

@@ -1,0 +1,7 @@
+## Copy to android/key.properties (do NOT commit)
+#
+# storeFile=/absolute/or/relative/path/to/your-release-keystore.jks
+# storePassword=*****
+# keyAlias=*****
+# keyPassword=*****
+

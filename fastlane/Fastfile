@@ -1,0 +1,300 @@
+require "yaml"
+
+default_platform(:ios)
+
+# unitGacha fastlane (inspired by joymath)
+#
+# Notes:
+# - This project is Flutter. Version/build are read from pubspec.yaml (e.g. 3.3.1+14)
+# - iOS: build ipa via Xcode workspace, upload via deliver
+# - Android: build AAB, upload via upload_to_play_store
+
+# fastlane が UTF-8 ロケールを要求するため、未設定/非UTF-8なら補正する
+def ensure_utf8_locale
+  %w[LANG LC_ALL].each do |k|
+    v = ENV[k].to_s
+    next if !v.empty? && v.upcase.include?("UTF-8")
+
+    ENV[k] = "en_US.UTF-8"
+  end
+end
+
+ensure_utf8_locale
+
+# App Store Connect のローカライゼーション揺れ対策（必要なら拡張）
+ALLOWED_LOCALES = ["en-US", "ja", "ja-JP"]
+
+def normalize_localized_hash(h)
+  return h unless h.is_a?(Hash)
+  h
+end
+
+# APIキーがあれば使い、無ければ nil（Apple ID フォールバック用）
+def asc_api_key_or_nil
+  key_id = ENV["ASC_KEY_ID"].to_s
+  issuer = ENV["ASC_ISSUER_ID"].to_s
+
+  return nil if key_id.empty? || issuer.empty?
+
+  key_path =
+    (ENV["ASC_P8_PATH"] ||
+      File.expand_path("~/.appstoreconnect/private_keys/AuthKey_#{key_id}.p8")).to_s
+  return nil unless File.exist?(key_path)
+
+  app_store_connect_api_key(
+    key_id: key_id,
+    issuer_id: issuer,
+    key_filepath: key_path,
+    duration: 1200,
+    in_house: false
+  )
+end
+
+# helper: Pod install を行う（bundle exec が失敗しても pod を試す）
+def safe_pod_install
+  # NOTE:
+  # - unitGacha はプロジェクト直下に Gemfile を置く想定
+  # - ios/ に Gemfile がある場合も考慮
+  #
+  # GEM_PATH をクリアしてシステムの gem パスを使用しないようにする
+  sh(
+    "cd .. && export LANG=en_US.UTF-8 && unset GEM_PATH && " \
+      "if [ -f Gemfile ]; then " \
+      "bundle config set --local path 'vendor/bundle' && bundle install && " \
+      "cd ios && (bundle exec pod install --repo-update || pod install --repo-update); " \
+      "else " \
+      "cd ios && pod install --repo-update; " \
+      "fi"
+  )
+end
+
+# helper: pubspec.yaml からバージョン情報を取得
+def get_version_info
+  pubspec_path = File.expand_path("../pubspec.yaml", __dir__)
+  unless File.exist?(pubspec_path)
+    UI.user_error!("pubspec.yaml not found at #{pubspec_path}")
+  end
+  pubspec = YAML.load_file(pubspec_path)
+  pub_version = pubspec["version"] # e.g. "3.3.1+14"
+  version_number, build_number = pub_version.split("+")
+  {
+    version: version_number,
+    build: build_number,
+    full: pub_version
+  }
+end
+
+# helper: ビルド済みファイルの存在チェック
+def check_built_files(_version_info)
+  aab_path = File.expand_path("../build/app/outputs/bundle/release/app-release.aab", __dir__)
+  ipa_path = File.expand_path("../Runner.ipa", __dir__)
+
+  {
+    aab_exists: File.exist?(aab_path),
+    ipa_exists: File.exist?(ipa_path),
+    aab_path: aab_path,
+    ipa_path: ipa_path
+  }
+end
+
+# helper: Android changelog を生成（日本語と英語の両方）
+def generate_android_changelogs(build_number, release_note, release_note_en)
+  changelog_ja_path =
+    File.expand_path("./metadata/android/ja-JP/changelogs/#{build_number}.txt", __dir__)
+  changelog_en_path =
+    File.expand_path("./metadata/android/en-US/changelogs/#{build_number}.txt", __dir__)
+
+  sh("mkdir -p #{File.dirname(changelog_ja_path)}")
+  sh("mkdir -p #{File.dirname(changelog_en_path)}")
+
+  File.write(changelog_ja_path, release_note)
+  File.write(changelog_en_path, release_note_en)
+
+  UI.message("Android changelogs generated:")
+  UI.message(" - #{changelog_ja_path}")
+  UI.message(" - #{changelog_en_path}")
+end
+
+# 固定の promotional text（必要なら編集）
+FIXED_PROMOTIONAL_EN = "Learn physics units efficiently with gacha-style practice."
+FIXED_PROMOTIONAL_JA = "ガチャ形式で物理の単位を効率的に学ぼう！"
+
+desc "iOS と Android の両方を一撃でリリース"
+desc "options: skip_build:true, skip_ios:true, skip_android:true, notes:'...', notes_en:'...'"
+lane :release_all_platforms do |options|
+  release_note = options[:notes] || "バグ修正と改善を行いました。"
+  release_note_en = options[:notes_en] || "Bug fixes and improvements."
+  skip_build = options[:skip_build] || false
+  skip_ios = options[:skip_ios] || false
+  skip_android = options[:skip_android] || false
+
+  UI.header("Starting release process")
+  UI.message("Release notes (ja): #{release_note.inspect}")
+  UI.message("Release notes (en): #{release_note_en.inspect}")
+  UI.message("Options: skip_build=#{skip_build}, skip_ios=#{skip_ios}, skip_android=#{skip_android}")
+
+  # --- pubspec.yaml からバージョン取得 ---
+  version_info = get_version_info
+  version_number = version_info[:version]
+  build_number = version_info[:build]
+  UI.message("Version: #{version_number} (#{build_number})")
+
+  built_files = check_built_files(version_info)
+  UI.message("Found existing AAB: #{built_files[:aab_path]}") if built_files[:aab_exists]
+  UI.message("Found existing IPA: #{built_files[:ipa_path]}") if built_files[:ipa_exists]
+
+  # iOS release notes を metadata ファイルに書き込み（deliver が読み込む）
+  release_notes_ja_path = "./metadata/ja/release_notes.txt"
+  release_notes_en_path = "./metadata/en-US/release_notes.txt"
+  sh("mkdir -p #{File.dirname(release_notes_ja_path)}")
+  sh("mkdir -p #{File.dirname(release_notes_en_path)}")
+  File.write(release_notes_ja_path, release_note)
+  File.write(release_notes_en_path, release_note_en)
+
+  unless skip_build
+    UI.header("Building Flutter app")
+    sh("cd .. && flutter clean")
+    sh("cd .. && flutter pub get")
+    safe_pod_install
+
+    unless skip_android
+      UI.message("Building Android AAB...")
+      sh("cd .. && flutter build appbundle --release --build-name #{version_number} --build-number #{build_number}")
+    end
+
+    unless skip_ios
+      UI.message("Building iOS ipa...")
+      increment_version_number(
+        version_number: version_number,
+        xcodeproj: File.expand_path("../ios/Runner.xcodeproj", __dir__)
+      )
+      increment_build_number(
+        build_number: build_number,
+        xcodeproj: File.expand_path("../ios/Runner.xcodeproj", __dir__)
+      )
+      build_app(
+        workspace: File.expand_path("../ios/Runner.xcworkspace", __dir__),
+        scheme: "Runner",
+        export_method: "app-store",
+        output_directory: File.expand_path("..", __dir__),
+        clean: false,
+        suppress_xcode_output: false
+      )
+    end
+  else
+    UI.message("Skipping build (using existing files)")
+    unless skip_android || built_files[:aab_exists]
+      UI.user_error!("AAB file not found at #{built_files[:aab_path]}. Remove skip_build or build first.")
+    end
+    unless skip_ios || built_files[:ipa_exists]
+      UI.user_error!("IPA file not found at #{built_files[:ipa_path]}. Remove skip_build or build first.")
+    end
+  end
+
+  #####################
+  # iOS アップロード
+  #####################
+  unless skip_ios
+    UI.header("Uploading iOS app to App Store Connect")
+
+    uses_non_exempt =
+      (get_info_plist_value(
+        path: File.expand_path("../ios/Runner/Info.plist", __dir__),
+        key: "ITSAppUsesNonExemptEncryption"
+      ) || false)
+
+    api = asc_api_key_or_nil
+    if api
+      deliver_common = {
+        api_key: api,
+        app_identifier: "com.joyphysics.unitgacha",
+        force: true,
+        skip_metadata: false,
+        skip_screenshots: true,
+        submit_for_review: false,
+        automatic_release: false,
+        ignore_language_directory_validation: true,
+        promotional_text: {
+          "en-US" => FIXED_PROMOTIONAL_EN,
+          "ja" => FIXED_PROMOTIONAL_JA
+        },
+        submission_information: {
+          export_compliance_platform: "ios",
+          export_compliance_compliance_required: false,
+          export_compliance_encryption_updated: false,
+          export_compliance_uses_encryption: uses_non_exempt,
+          export_compliance_uses_non_exempt_encryption: uses_non_exempt,
+          export_compliance_is_exempt: !uses_non_exempt,
+          add_id_info_uses_idfa: false
+        },
+        run_precheck_before_submit: false
+      }
+
+      deliver_common[:promotional_text] = normalize_localized_hash(deliver_common[:promotional_text])
+      deliver(deliver_common)
+      UI.success("iOS upload complete")
+    else
+      UI.message("App Store Connect API Key not found, using Apple ID fallback")
+      deliver_common = {
+        username: (ENV["FASTLANE_USER"] || ""),
+        app_identifier: "com.joyphysics.unitgacha",
+        submit_for_review: false,
+        force: true,
+        automatic_release: false,
+        skip_metadata: false,
+        skip_screenshots: true,
+        ignore_language_directory_validation: true,
+        promotional_text: {
+          "en-US" => FIXED_PROMOTIONAL_EN,
+          "ja" => FIXED_PROMOTIONAL_JA
+        },
+        submission_information: {
+          export_compliance_uses_encryption: uses_non_exempt,
+          export_compliance_uses_non_exempt_encryption: uses_non_exempt,
+          export_compliance_is_exempt: !uses_non_exempt,
+          export_compliance_encryption_updated: false,
+          add_id_info_uses_idfa: false
+        }
+      }
+
+      deliver_common[:promotional_text] = normalize_localized_hash(deliver_common[:promotional_text])
+      deliver(deliver_common)
+      UI.success("iOS upload complete")
+    end
+  end
+
+  #####################
+  # Android アップロード
+  #####################
+  unless skip_android
+    UI.header("Uploading Android app to Google Play")
+    generate_android_changelogs(build_number, release_note, release_note_en)
+
+    upload_to_play_store(
+      package_name: "com.joyphysics.unitgacha",
+      json_key: File.expand_path("./unit-gacha-fastlane.json", __dir__),
+      track: "production",
+      changes_not_sent_for_review: true,
+      aab: File.expand_path("../build/app/outputs/bundle/release/app-release.aab", __dir__),
+      metadata_path: File.expand_path("./metadata/android", __dir__)
+    )
+    UI.success("Android upload complete")
+  end
+
+  UI.success("Release process completed")
+end
+
+platform :ios do
+  desc "iOS リリースを自動化"
+  lane :release_all do |options|
+    release_all_platforms(options.merge(skip_android: true))
+  end
+end
+
+platform :android do
+  desc "Android リリースを自動化"
+  lane :release_all do |options|
+    release_all_platforms(options.merge(skip_ios: true))
+  end
+end
+

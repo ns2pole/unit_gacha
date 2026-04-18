@@ -1,0 +1,111 @@
+{
+  "schema": {
+    "quantities": {
+      "fields": ["no", "jp", "en", "unit_symbol", "unit_name", "unit_name_en", "main_quantity_symbols", "unit_relations"]
+    },
+    "constants": {
+      "fields": ["no", "jp", "symbol", "approx_value", "exact_value"]
+    }
+  },
+  "quantities": [
+    {"no":1,"jp":"長さ","en":"length","unit_symbol":"m","unit_name":"メートル","unit_name_en":"meter","main_quantity_symbols":["l","L","d"],"unit_relations":[]},
+    {"no":2,"jp":"質量","en":"mass","unit_symbol":"kg","unit_name":"キログラム","unit_name_en":"kilogram","main_quantity_symbols":["m","M"],"unit_relations":[]},
+    {"no":3,"jp":"時間","en":"time","unit_symbol":"s","unit_name":"秒","unit_name_en":"second","main_quantity_symbols":["t","T"],"unit_relations":[]},
+    {"no":4,"jp":"電流","en":"electric current","unit_symbol":"A","unit_name":"アンペア","unit_name_en":"ampere","main_quantity_symbols":["I","i"],"unit_relations":[]},
+    {"no":5,"jp":"温度","en":"temperature","unit_symbol":"K","unit_name":"ケルビン","unit_name_en":"kelvin","main_quantity_symbols":["T","t"],"unit_relations":["0 K = −273.15 ℃"]},
+    {"no":6,"jp":"物質量","en":"amount of mass","unit_symbol":"mol","unit_name":"モル","unit_name_en":"mole","main_quantity_symbols":["n"],"unit_relations":[]},
+    {"no":7,"jp":"光度","en":"luminous intensity","unit_symbol":"cd","unit_name":"カンデラ","unit_name_en":"candela","main_quantity_symbols":[],"unit_relations":[]},
+    {"no":8,"jp":"面積","en":"area","unit_symbol":"m^2","unit_name":"平方メートル","unit_name_en":"square meter","main_quantity_symbols":["S"],"unit_relations":[]},
+    {"no":9,"jp":"体積","en":"volume","unit_symbol":"m^3","unit_name":"立方メートル","unit_name_en":"cubic meter","main_quantity_symbols":["V"],"unit_relations":[]},
+    {"no":10,"jp":"密度","en":"density","unit_symbol":"kg/m^3","unit_name":"キログラム毎立方メートル","unit_name_en":"kilogram per cubic meter","main_quantity_symbols":["ρ"],"unit_relations":[]},
+    {"no":11,"jp":"角度","en":"angle","unit_symbol":"rad, °","unit_name":"ラジアン，度","unit_name_en":"radian, degree","main_quantity_symbols":["θ","φ"],"unit_relations":["1 rad ≒ 57.3°"]},
+    {"no":12,"jp":"位相","en":"phase","unit_symbol":"rad","unit_name":"ラジアン","unit_name_en":"radian","main_quantity_symbols":["θ","φ"],"unit_relations":[]},
+    {"no":13,"jp":"変位","en":"displacement","unit_symbol":"m","unit_name":"メートル","unit_name_en":"meter","main_quantity_symbols":["x","s"],"unit_relations":[]},
+    {"no":14,"jp":"速度","en":"velocity","unit_symbol":"m/s","unit_name":"メートル毎秒","unit_name_en":"meter per second","main_quantity_symbols":["v","V"],"unit_relations":[]},
+    {"no":15,"jp":"加速度","en":"acceleration","unit_symbol":"m/s^2","unit_name":"メートル毎秒毎秒","unit_name_en":"meter per second squared","main_quantity_symbols":["a"],"unit_relations":[]},
+    {"no":16,"jp":"力","en":"force","unit_symbol":"N","unit_name":"ニュートン","unit_name_en":"newton","main_quantity_symbols":["F","f"],"unit_relations":["1 N = 1 kg·m/s^2"]},
+    {"no":17,"jp":"ばね定数","en":"spring constant","unit_symbol":"N/m","unit_name":"ニュートン毎メートル","unit_name_en":"newton per meter","main_quantity_symbols":["k"],"unit_relations":[]},
+    {"no":18,"jp":"静止摩擦係数","en":"coefficient of static friction","unit_symbol":"","unit_name":"","unit_name_en":"","main_quantity_symbols":["μ0"],"unit_relations":[]},
+    {"no":19,"jp":"動摩擦係数","en":"coefficient of kinetic friction","unit_symbol":"","unit_name":"","unit_name_en":"","main_quantity_symbols":["μ′"],"unit_relations":[]},
+    {"no":20,"jp":"力のモーメント","en":"moment of force","unit_symbol":"N·m","unit_name":"ニュートンメートル","unit_name_en":"newton meter","main_quantity_symbols":["M"],"unit_relations":[]},
+    {"no":21,"jp":"圧力","en":"pressure","unit_symbol":"Pa, atm","unit_name":"パスカル，気圧","unit_name_en":"pascal, atmosphere","main_quantity_symbols":["p","P"],"unit_relations":["1 Pa = 1 N/m^2","1 atm = 1.013×10^5 Pa"]},
+    {"no":22,"jp":"運動量","en":"momentum","unit_symbol":"kg·m/s","unit_name":"キログラムメートル毎秒","unit_name_en":"kilogram meter per second","main_quantity_symbols":["p"],"unit_relations":[]},
+    {"no":23,"jp":"力積","en":"impulse","unit_symbol":"N·s","unit_name":"ニュートン秒","unit_name_en":"newton second","main_quantity_symbols":["I"],"unit_relations":["1 N·s = 1 kg·m/s"]},
+    {"no":24,"jp":"反発係数","en":"coefficient of restitution","unit_symbol":"","unit_name":"","unit_name_en":"","main_quantity_symbols":["e"],"unit_relations":[]},
+    {"no":25,"jp":"仕事","en":"work","unit_symbol":"J","unit_name":"ジュール","unit_name_en":"joule","main_quantity_symbols":["W","E"],"unit_relations":["1 J = 1 N·m"]},
+    {"no":26,"jp":"エネルギー","en":"energy","unit_symbol":"J","unit_name":"ジュール","unit_name_en":"joule","main_quantity_symbols":["K","U"],"unit_relations":["1 J = 1 kg·m^2/s^2"]},
+    {"no":27,"jp":"仕事率","en":"power","unit_symbol":"W","unit_name":"ワット","unit_name_en":"watt","main_quantity_symbols":["P"],"unit_relations":["1 W = 1 J/s"]},
+    {"no":28,"jp":"角速度","en":"angular velocity","unit_symbol":"rad/s","unit_name":"ラジアン毎秒","unit_name_en":"radian per second","main_quantity_symbols":["ω"],"unit_relations":[]},
+    {"no":29,"jp":"角振動数","en":"angular frequency","unit_symbol":"rad/s","unit_name":"ラジアン毎秒","unit_name_en":"radian per second","main_quantity_symbols":["ω"],"unit_relations":[]},
+    {"no":30,"jp":"周期","en":"period","unit_symbol":"s","unit_name":"秒","unit_name_en":"second","main_quantity_symbols":["T"],"unit_relations":[]},
+    {"no":31,"jp":"回転数","en":"rotation rate","unit_symbol":"回/s","unit_name":"回毎秒","unit_name_en":"revolution per second","main_quantity_symbols":["n"],"unit_relations":["1 回/s = 1/s"]},
+    {"no":32,"jp":"振幅","en":"amplitude","unit_symbol":"m","unit_name":"メートル","unit_name_en":"meter","main_quantity_symbols":["A"],"unit_relations":[]},
+    {"no":33,"jp":"振動数・周波数","en":"frequency","unit_symbol":"Hz","unit_name":"ヘルツ","unit_name_en":"hertz","main_quantity_symbols":["f"],"unit_relations":["1 Hz = 1/s"]},
+    {"no":34,"jp":"熱量","en":"heat quantity","unit_symbol":"J","unit_name":"ジュール","unit_name_en":"joule","main_quantity_symbols":["Q"],"unit_relations":["1 cal ≒ 4.2 J"]},
+    {"no":35,"jp":"比熱","en":"specific heat","unit_symbol":"J/(g·K)","unit_name":"ジュール毎グラム毎ケルビン","unit_name_en":"joule per gram per kelvin","main_quantity_symbols":["c"],"unit_relations":[]},
+    {"no":36,"jp":"熱容量","en":"heat capacity","unit_symbol":"J/K","unit_name":"ジュール毎ケルビン","unit_name_en":"joule per kelvin","main_quantity_symbols":["C"],"unit_relations":[]},
+    {"no":37,"jp":"潜熱","en":"latent heat","unit_symbol":"J/g","unit_name":"ジュール毎グラム","unit_name_en":"joule per gram","main_quantity_symbols":["L"],"unit_relations":[]},
+    {"no":38,"jp":"熱効率","en":"thermal efficiency","unit_symbol":"","unit_name":"","unit_name_en":"","main_quantity_symbols":["e"],"unit_relations":[]},
+    {"no":39,"jp":"モル比熱","en":"molar heat capacity","unit_symbol":"J/(mol·K)","unit_name":"ジュール毎モル毎ケルビン","unit_name_en":"joule per mole per kelvin","main_quantity_symbols":["Cv","Cp"],"unit_relations":[]},
+    {"no":40,"jp":"波長","en":"wavelength","unit_symbol":"m","unit_name":"メートル","unit_name_en":"meter","main_quantity_symbols":["λ"],"unit_relations":[]},
+    {"no":41,"jp":"電気量・電荷","en":"quantity of electricity","unit_symbol":"C","unit_name":"クーロン","unit_name_en":"coulomb","main_quantity_symbols":["q","Q"],"unit_relations":["1 C = 1 A·s"]},
+    {"no":42,"jp":"電界の強さ","en":"electric field","unit_symbol":"N/C, V/m","unit_name":"ニュートン毎クーロン, ボルト毎メートル","unit_name_en":"newton per coulomb, volt per meter","main_quantity_symbols":["E"],"unit_relations":["1 N/C = 1 V/m"]},
+    {"no":43,"jp":"電圧・電位・電位差","en":"voltage / electric potential / potential difference","unit_symbol":"V","unit_name":"ボルト","unit_name_en":"volt","main_quantity_symbols":["V"],"unit_relations":["1 V = 1 J/C"]},
+    {"no":44,"jp":"電気抵抗","en":"resistance","unit_symbol":"Ω","unit_name":"オーム","unit_name_en":"ohm","main_quantity_symbols":["R"],"unit_relations":["1 Ω = 1 V/A"]},
+    {"no":45,"jp":"抵抗率","en":"resistivity","unit_symbol":"Ω·m","unit_name":"オームメートル","unit_name_en":"ohm meter","main_quantity_symbols":["ρ"],"unit_relations":[]},
+    {"no":46,"jp":"抵抗率の温度係数","en":"temperature coefficient of resistivity","unit_symbol":"1/K","unit_name":"毎ケルビン","unit_name_en":"per kelvin","main_quantity_symbols":["α"],"unit_relations":[]},
+    {"no":47,"jp":"電力","en":"electric power","unit_symbol":"W","unit_name":"ワット","unit_name_en":"watt","main_quantity_symbols":["P"],"unit_relations":["1 W = 1 V·A"]},
+    {"no":48,"jp":"電力量","en":"electric energy","unit_symbol":"J, Wh","unit_name":"ジュール, ワット時","unit_name_en":"joule, watt hour","main_quantity_symbols":["Q","W"],"unit_relations":["1 J = 1 V·C = 1 A·V·s"]},
+    {"no":49,"jp":"電気容量","en":"electric capacity","unit_symbol":"F","unit_name":"ファラド","unit_name_en":"farad","main_quantity_symbols":["C"],"unit_relations":["1 F = 1 C/V"]},
+    {"no":50,"jp":"誘電率","en":"permittivity","unit_symbol":"F/m","unit_name":"ファラド毎メートル","unit_name_en":"farad per meter","main_quantity_symbols":["ε"],"unit_relations":[]},
+    {"no":51,"jp":"比誘電率","en":"relative permittivity","unit_symbol":"","unit_name":"","unit_name_en":"","main_quantity_symbols":["εr"],"unit_relations":[]},
+    {"no":52,"jp":"磁気量","en":"magnetic charge","unit_symbol":"Wb","unit_name":"ウェーバ","unit_name_en":"weber","main_quantity_symbols":["m"],"unit_relations":["1 Wb = 1 V·s"]},
+    {"no":53,"jp":"磁界の強さ","en":"magnetic field","unit_symbol":"N/Wb, A/m","unit_name":"ニュートン毎ウェーバ, アンペア毎メートル","unit_name_en":"newton per weber, ampere per meter","main_quantity_symbols":["H"],"unit_relations":["1 N/Wb = 1 A/m"]},
+    {"no":54,"jp":"透磁率","en":"permeability","unit_symbol":"N/A^2","unit_name":"ニュートン毎アンペア毎アンペア","unit_name_en":"newton per ampere squared","main_quantity_symbols":["μ"],"unit_relations":[]},
+    {"no":55,"jp":"比透磁率","en":"relative permeability","unit_symbol":"","unit_name":"","unit_name_en":"","main_quantity_symbols":["μr"],"unit_relations":[]},
+    {"no":56,"jp":"磁束密度","en":"magnetic flux density","unit_symbol":"T, Wb/m^2, N/(A·m)","unit_name":"テスラ, ウェーバ毎平方メートル, ニュートン毎アンペア毎メートル","unit_name_en":"tesla, weber per square meter, newton per ampere per meter","main_quantity_symbols":["B"],"unit_relations":["1 T = 1 Wb/m^2 = 1 N/(A·m)"]},
+    {"no":57,"jp":"磁束","en":"magnetic flux","unit_symbol":"Wb","unit_name":"ウェーバ","unit_name_en":"weber","main_quantity_symbols":["Φ"],"unit_relations":["1 Wb = 1 N·m/A"]},
+    {"no":58,"jp":"インダクタンス","en":"inductance","unit_symbol":"H","unit_name":"ヘンリー","unit_name_en":"henry","main_quantity_symbols":["L","M"],"unit_relations":["1 H = 1 V·s/A = 1 Wb/A"]},
+    {"no":59,"jp":"リアクタンス・インピーダンス","en":"reactance / impedance","unit_symbol":"Ω","unit_name":"オーム","unit_name_en":"ohm","main_quantity_symbols":["Z"],"unit_relations":[]},
+    {"no":60,"jp":"仕事関数","en":"work function","unit_symbol":"J, eV","unit_name":"ジュール, 電子ボルト","unit_name_en":"joule, electron volt","main_quantity_symbols":["W"],"unit_relations":["1 eV = 1.60×10^-19 J"]},
+    {"no":61,"jp":"放射能の強さ","en":"radioactivity","unit_symbol":"Bq","unit_name":"ベクレル","unit_name_en":"becquerel","main_quantity_symbols":[],"unit_relations":["1 Bq = 1/s"]},
+    {"no":62,"jp":"吸収線量","en":"absorbed dose","unit_symbol":"Gy","unit_name":"グレイ","unit_name_en":"gray","main_quantity_symbols":[],"unit_relations":["1 Gy = 1 J/kg"]},
+    {"no":63,"jp":"等価線量","en":"equivalent dose","unit_symbol":"Sv","unit_name":"シーベルト","unit_name_en":"sievert","main_quantity_symbols":[],"unit_relations":["1 Sv = 係数 × Gy"]}
+  ],
+  "constants": [
+    {"no":1,"jp":"重力加速度（標準）","symbol":"g","approx_value":"9.8 m/s^2","exact_value":"9.80665 m/s^2"},
+    {"no":2,"jp":"万有引力定数","symbol":"G","approx_value":"6.67×10^-11 N·m^2/kg^2","exact_value":"6.67408×10^-11 N·m^2/kg^2"},
+    {"no":3,"jp":"絶対零度（0 K）","symbol":"","approx_value":"−273 ℃","exact_value":"−273.15 ℃"},
+    {"no":4,"jp":"熱の仕事当量","symbol":"J","approx_value":"4.2 J/cal","exact_value":"4.18580 J/cal"},
+    {"no":5,"jp":"アボガドロ定数","symbol":"N_A","approx_value":"6.02×10^23 /mol","exact_value":"6.02214076×10^23 /mol"},
+    {"no":6,"jp":"標準大気圧（1 気圧）","symbol":"p0","approx_value":"1.013×10^5 Pa","exact_value":"1.01325×10^5 Pa"},
+    {"no":7,"jp":"理想気体 1 mol の体積（0 ℃・1 気圧）","symbol":"V0","approx_value":"2.24×10^-2 m^3","exact_value":"2.2413962×10^-2 m^3"},
+    {"no":8,"jp":"気体定数","symbol":"R (= kN_A)","approx_value":"8.31 J/(mol·K)","exact_value":"8.314462618… J/(mol·K)"},
+    {"no":9,"jp":"ボルツマン定数","symbol":"k","approx_value":"1.38×10^-23 J/K","exact_value":"1.380649×10^-23 J/K"},
+    {"no":10,"jp":"乾燥空気中の音速（0 ℃・1 気圧）","symbol":"v","approx_value":"331.5 m/s","exact_value":"3.3145×10^2 m/s"},
+    {"no":11,"jp":"真空中の光速","symbol":"c","approx_value":"3.0×10^8 m/s","exact_value":"2.99792458×10^8 m/s"},
+    {"no":12,"jp":"電気力に関するクーロンの法則の比例定数（真空）","symbol":"k0 (= 1/4πϵ0)","approx_value":"9.0×10^9 N·m^2/C^2","exact_value":"8.987…×10^9 N·m^2/C^2"},
+    {"no":13,"jp":"真空の誘電率","symbol":"ϵ0 (= 1/μ0c^2)","approx_value":"8.85×10^-12 F/m","exact_value":"8.854187817…×10^-12 F/m"},
+    {"no":14,"jp":"磁気力に関するクーロンの法則の比例定数（真空）","symbol":"km (= 1/4πμ0)","approx_value":"6.33×10^4 N·m^2/Wb^2","exact_value":"6.332…×10^4 N·m^2/Wb^2"},
+    {"no":15,"jp":"真空の透磁率","symbol":"μ0","approx_value":"1.26×10^-6 N/A^2","exact_value":"1.25663706212×10^-6 N/A^2"},
+    {"no":16,"jp":"電子の比電荷","symbol":"e/me","approx_value":"1.76×10^11 C/kg","exact_value":"1.75882001076×10^11 C/kg"},
+    {"no":17,"jp":"電子の質量","symbol":"me","approx_value":"9.11×10^-31 kg","exact_value":"9.1093837015×10^-31 kg（5.4857990906×10^-4 u）"},
+    {"no":18,"jp":"電気素量","symbol":"e","approx_value":"1.60×10^-19 C","exact_value":"1.602176634×10^-19 C"},
+    {"no":19,"jp":"プランク定数","symbol":"h","approx_value":"6.63×10^-34 J·s","exact_value":"6.62607015×10^-34 J·s"},
+    {"no":20,"jp":"電子ボルト","symbol":"","approx_value":"1.60×10^-19 J","exact_value":"1 eV = 1.602176634×10^-19 J"},
+    {"no":21,"jp":"リュードベリ定数","symbol":"R","approx_value":"1.097×10^7 /m","exact_value":"1.0973731568508×10^7 /m"},
+    {"no":22,"jp":"ボーア半径","symbol":"a0","approx_value":"5.29×10^-11 m","exact_value":"5.2917721067×10^-11 m"},
+    {"no":23,"jp":"統一原子質量単位","symbol":"u","approx_value":"1.661×10^-27 kg","exact_value":"1 u = 1.660539066×10^-27 kg"},
+    {"no":24,"jp":"陽子の質量","symbol":"mp","approx_value":"1.67×10^-27 kg","exact_value":"1.67262192369×10^-27 kg（1.007276466621 u）"},
+    {"no":25,"jp":"中性子の質量","symbol":"mn","approx_value":"1.67×10^-27 kg","exact_value":"1.67492749804×10^-27 kg（1.00866491595 u）"}
+  ]
+}
+
+
+
+
+
+
+
+
+

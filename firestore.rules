@@ -1,0 +1,148 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ユーザー認証チェック関数
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // ユーザーが自分のデータにアクセスしているかチェック
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isString(x) {
+      return x is string;
+    }
+
+    function isBool(x) {
+      return x is bool;
+    }
+
+    function validNickname(n) {
+      // null or string length 1..12 (trim validation is done client-side)
+      return n == null || (isString(n) && n.size() >= 1 && n.size() <= 12);
+    }
+    
+    // ============================================================
+    // ユーザー設定へのアクセス
+    // ============================================================
+    match /users/{userId} {
+      // ユーザーは自分のドキュメントを読み書きできる
+      allow read, write: if isOwner(userId);
+      
+      // ============================================================
+      // 設定コレクション
+      // ============================================================
+      match /settings/{settingDoc} {
+        // ユーザーは自分の設定ドキュメントを読み書きできる
+        // settingDocには以下が含まれる:
+        // - user_settings
+        // - premium_purchased
+        // - gacha_settings (サブコレクションの親)
+        // - other_settings (サブコレクションの親)
+        allow read, write: if isOwner(userId);
+      }
+      
+      // ============================================================
+      // ガチャ設定サブコレクション
+      // ============================================================
+      // パス: users/{userId}/settings/gacha_settings/gacha_types/{gachaType}
+      // gacha_settingsはsettingsコレクションのドキュメント
+      match /settings/gacha_settings {
+        // ガチャ設定ドキュメント自体へのアクセス
+        allow read, write: if isOwner(userId);
+        
+        // ガチャタイプのサブコレクション
+        match /gacha_types/{gachaType} {
+          allow read, write: if isOwner(userId);
+        }
+        // コレクション全体をリストするクエリを許可（get()クエリ用）
+        match /gacha_types {
+          allow list: if isOwner(userId);
+        }
+      }
+      
+      // ============================================================
+      // その他の設定サブコレクション
+      // ============================================================
+      // パス: users/{userId}/settings/other_settings/keys/{key}
+      // other_settingsはsettingsコレクションのドキュメント
+      match /settings/other_settings {
+        // その他の設定ドキュメント自体へのアクセス
+        allow read, write: if isOwner(userId);
+        
+        // キーのサブコレクション
+        match /keys/{key} {
+          allow read, write: if isOwner(userId);
+        }
+        // コレクション全体をリストするクエリを許可（get()クエリ用）
+        match /keys {
+          allow list: if isOwner(userId);
+        }
+      }
+      
+      // ============================================================
+      // 学習記録コレクション
+      // ============================================================
+      // パス: users/{userId}/learning_records/{problemId}
+      match /learning_records/{problemId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // ============================================================
+      // 公開プロフィール（ランキング用）
+      // ============================================================
+      // パス: users/{userId}/public_profile/unit_gacha
+      match /public_profile/unit_gacha {
+        // ランキング表示のため、ログイン済みユーザーは読み取り可能
+        allow read: if isAuthenticated();
+        // 書き込みは本人のみ＋最小バリデーション
+        allow write: if isOwner(userId)
+          && (!('nickname' in request.resource.data) || validNickname(request.resource.data.nickname))
+          && (!('participating' in request.resource.data) || isBool(request.resource.data.participating));
+      }
+
+      // その他のpublic_profileは現時点では非公開（将来拡張時に個別に許可する）
+      match /public_profile/{profileDoc} {
+        allow read, write: if false;
+      }
+
+      // ============================================================
+      // 解答イベント（ランキング集計用）
+      // ============================================================
+      // パス: users/{userId}/unit_gacha_attempt_events/{eventId}
+      match /unit_gacha_attempt_events/{eventId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && request.resource.data.keys().hasOnly(['problemId', 'status', 'clientTime'])
+          && isString(request.resource.data.problemId)
+          && isString(request.resource.data.status)
+          && (request.resource.data.status == 'solved' || request.resource.data.status == 'failed')
+          && isString(request.resource.data.clientTime);
+        // 冪等性: 同じeventIdで同じ内容を再送する場合のみupdateを許可（内容変更は不可）
+        allow update: if isOwner(userId)
+          && request.resource.data.keys().hasOnly(['problemId', 'status', 'clientTime'])
+          && request.resource.data.problemId == resource.data.problemId
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.clientTime == resource.data.clientTime;
+        allow delete: if false;
+      }
+    }
+
+    // ============================================================
+    // リーダーボード（ランキング表示用）
+    // ============================================================
+    // パス: leaderboards/** (Cloud Functions/Admin SDKのみが書き込む)
+    match /leaderboards/{docId}/{path=**} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+  }
+}
+
+
+
+
+
