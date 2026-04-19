@@ -10,14 +10,14 @@
       "android": {
         "default": {
           "projectId": "unitgacha",
-          "appId": "1:783432771734:android:ea7d5dcb556f8523093ab7",
+          "appId": "1:783432771734:android:68d191fab025454a093ab7",
           "fileOutput": "android/app/google-services.json"
         }
       },
       "ios": {
         "default": {
           "projectId": "unitgacha",
-          "appId": "1:783432771734:ios:0926c8f1dd7e52e0093ab7",
+          "appId": "1:783432771734:ios:de0593ac51ed3490093ab7",
           "uploadDebugSymbols": false,
           "fileOutput": "ios/Runner/GoogleService-Info.plist"
         }
@@ -26,8 +26,8 @@
         "lib/firebase_options.dart": {
           "projectId": "unitgacha",
           "configurations": {
-            "android": "1:783432771734:android:ea7d5dcb556f8523093ab7",
-            "ios": "1:783432771734:ios:0926c8f1dd7e52e0093ab7"
+            "android": "1:783432771734:android:68d191fab025454a093ab7",
+            "ios": "1:783432771734:ios:de0593ac51ed3490093ab7"
           }
         }
       }

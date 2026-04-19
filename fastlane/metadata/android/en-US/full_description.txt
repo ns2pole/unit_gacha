@@ -1,0 +1,3 @@
+Unit Gacha is a study app that helps you practice common physics units with quick gacha-style drills.
+
+You can review unit conversions and recognition in short sessions, making it useful before class, homework, or exams.

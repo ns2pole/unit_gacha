@@ -2,7 +2,7 @@ name: unit_gacha
 description: "物理単位ガチャ専用アプリ"
 publish_to: 'none'
 
-version: 3.3.1+14
+version: 3.3.1+15
 
 environment:
   sdk: ^3.8.1

@@ -29,6 +29,17 @@ def normalize_localized_hash(h)
   h
 end
 
+def repo_root
+  File.expand_path("..", __dir__)
+end
+
+def expand_path_from_repo(path)
+  return path if path.nil? || path.empty?
+  return File.expand_path(path) if path.start_with?("/")
+
+  File.expand_path(path, repo_root)
+end
+
 # APIキーがあれば使い、無ければ nil（Apple ID フォールバック用）
 def asc_api_key_or_nil
   key_id = ENV["ASC_KEY_ID"].to_s
@@ -47,6 +58,61 @@ def asc_api_key_or_nil
     key_filepath: key_path,
     duration: 1200,
     in_house: false
+  )
+end
+
+def android_service_account_json_path
+  raw_path = ENV["PLAY_STORE_JSON_KEY"].to_s
+  raw_path = ENV["SUPPLY_JSON_KEY"].to_s if raw_path.empty?
+  raw_path = "fastlane/unit-gacha-fastlane.json" if raw_path.empty?
+  expand_path_from_repo(raw_path)
+end
+
+def android_release_key_properties_path
+  File.expand_path("../android/key.properties", __dir__)
+end
+
+def android_aab_path
+  raw_path = ENV["ANDROID_AAB_PATH"].to_s
+  raw_path = "build/app/outputs/bundle/release/app-release.aab" if raw_path.empty?
+  expand_path_from_repo(raw_path)
+end
+
+def ios_ipa_path
+  raw_path = ENV["IOS_IPA_PATH"].to_s
+  raw_path = "Runner.ipa" if raw_path.empty?
+  expand_path_from_repo(raw_path)
+end
+
+def ensure_android_release_prereqs!(skip_build:)
+  json_key_path = android_service_account_json_path
+  unless File.exist?(json_key_path)
+    UI.user_error!(
+      "Google Play service account JSON not found at #{json_key_path}.\n" \
+      "Place the file at fastlane/unit-gacha-fastlane.json or set PLAY_STORE_JSON_KEY / SUPPLY_JSON_KEY."
+    )
+  end
+
+  return if skip_build
+
+  unless File.exist?(android_release_key_properties_path)
+    UI.user_error!(
+      "android/key.properties not found at #{android_release_key_properties_path}.\n" \
+      "Copy android/key.properties.example and configure your release keystore before Android production release."
+    )
+  end
+end
+
+def ensure_ios_upload_prereqs!(api_key)
+  return if api_key
+
+  username = ENV["FASTLANE_USER"].to_s
+  app_password = ENV["FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD"].to_s
+  return unless username.empty? || app_password.empty?
+
+  UI.user_error!(
+    "App Store Connect credentials are missing.\n" \
+    "Set ASC_KEY_ID + ASC_ISSUER_ID (+ ASC_P8_PATH) for API key auth, or FASTLANE_USER + FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD for Apple ID fallback."
   )
 end
 
@@ -86,8 +152,8 @@ end
 
 # helper: ビルド済みファイルの存在チェック
 def check_built_files(_version_info)
-  aab_path = File.expand_path("../build/app/outputs/bundle/release/app-release.aab", __dir__)
-  ipa_path = File.expand_path("../Runner.ipa", __dir__)
+  aab_path = android_aab_path
+  ipa_path = ios_ipa_path
 
   {
     aab_exists: File.exist?(aab_path),
@@ -153,9 +219,10 @@ lane :release_all_platforms do |options|
 
   unless skip_build
     UI.header("Building Flutter app")
+    ensure_android_release_prereqs!(skip_build: false) unless skip_android
     sh("cd .. && flutter clean")
     sh("cd .. && flutter pub get")
-    safe_pod_install
+    safe_pod_install unless skip_ios
 
     unless skip_android
       UI.message("Building Android AAB...")
@@ -176,7 +243,8 @@ lane :release_all_platforms do |options|
         workspace: File.expand_path("../ios/Runner.xcworkspace", __dir__),
         scheme: "Runner",
         export_method: "app-store",
-        output_directory: File.expand_path("..", __dir__),
+        output_directory: File.dirname(built_files[:ipa_path]),
+        output_name: File.basename(built_files[:ipa_path]),
         clean: false,
         suppress_xcode_output: false
       )
@@ -204,6 +272,7 @@ lane :release_all_platforms do |options|
       ) || false)
 
     api = asc_api_key_or_nil
+    ensure_ios_upload_prereqs!(api_key: api)
     if api
       deliver_common = {
         api_key: api,
@@ -268,14 +337,15 @@ lane :release_all_platforms do |options|
   #####################
   unless skip_android
     UI.header("Uploading Android app to Google Play")
+    ensure_android_release_prereqs!(skip_build: skip_build)
     generate_android_changelogs(build_number, release_note, release_note_en)
 
     upload_to_play_store(
       package_name: "com.joyphysics.unitgacha",
-      json_key: File.expand_path("./unit-gacha-fastlane.json", __dir__),
+      json_key: android_service_account_json_path,
       track: "production",
       changes_not_sent_for_review: true,
-      aab: File.expand_path("../build/app/outputs/bundle/release/app-release.aab", __dir__),
+      aab: built_files[:aab_path],
       metadata_path: File.expand_path("./metadata/android", __dir__)
     )
     UI.success("Android upload complete")

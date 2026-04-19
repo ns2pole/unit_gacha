@@ -117,6 +117,9 @@ class _AuthPageState extends State<AuthPage> {
   bool _isPasswordResetMode = false;
   String? _errorMessage;
   String? _verificationId;
+  StreamSubscription<User?>? _authStateSubscription;
+  bool _awaitingPhoneAuthResult = false;
+  bool _authSuccessHandled = false;
 
   bool get _isEnglishUi => AppLocale.isEnglish(context);
 
@@ -272,15 +275,59 @@ class _AuthPageState extends State<AuthPage> {
     super.initState();
     // 初回登録フローの場合は新規登録モードで開始
     _isSignUp = widget.isInitialSignUp;
+    _authStateSubscription = FirebaseAuthService.authStateChanges.listen((user) {
+      if (user == null || !_awaitingPhoneAuthResult || _authSuccessHandled) {
+        return;
+      }
+      unawaited(_handlePhoneAuthSuccess());
+    });
   }
 
   @override
   void dispose() {
+    _authStateSubscription?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     _phoneController.dispose();
     _smsCodeController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handlePhoneAuthSuccess() async {
+    if (!mounted || _authSuccessHandled) return;
+
+    _authSuccessHandled = true;
+    _awaitingPhoneAuthResult = false;
+
+    // バックグラウンドで同期処理を実行（画面を閉じる前に開始）
+    _syncDataInBackground();
+
+    setState(() {
+      _isLoading = false;
+      _busyAction = _AuthBusyAction.none;
+      _errorMessage = null;
+    });
+
+    final loginMethod =
+        FirebaseAuthService.loginMethod ?? _t('電話番号', 'Phone');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _t(
+            '$loginMethodでクラウドに保存しました',
+            'Saved to cloud with $loginMethod',
+          ),
+        ),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    if (widget.onClose != null) {
+      widget.onClose!();
+    } else {
+      Navigator.of(context).pop(true);
+    }
   }
 
   Future<void> _sendPasswordResetEmail() async {
@@ -576,6 +623,9 @@ class _AuthPageState extends State<AuthPage> {
       _isLoading = true;
       _busyAction = _AuthBusyAction.sendSms;
       _errorMessage = null;
+      _verificationId = null;
+      _awaitingPhoneAuthResult = true;
+      _authSuccessHandled = false;
     });
 
     try {
@@ -594,6 +644,7 @@ class _AuthPageState extends State<AuthPage> {
       await FirebaseAuthService.verifyPhoneNumber(
         phoneNumber: phoneNumber,
         codeSent: (String verificationId) {
+          if (!mounted || _authSuccessHandled) return;
           setState(() {
             _verificationId = verificationId;
             _isSmsCodeSent = true;
@@ -603,6 +654,7 @@ class _AuthPageState extends State<AuthPage> {
         },
         verificationFailed: (String error) {
           print('Phone verification failed in UI: $error');
+          _awaitingPhoneAuthResult = false;
           setState(() {
             _errorMessage = error;
             _isLoading = false;
@@ -611,12 +663,14 @@ class _AuthPageState extends State<AuthPage> {
         },
         codeAutoRetrievalTimeout: (String verificationId) {
           // Androidで自動取得がタイムアウトした場合
+          if (!mounted || _authSuccessHandled) return;
           setState(() {
             _verificationId = verificationId;
           });
         },
       );
     } catch (e) {
+      _awaitingPhoneAuthResult = false;
       setState(() {
         _errorMessage =
             _t('SMSコードの送信に失敗しました: $e', 'Failed to send SMS code: $e');
@@ -627,6 +681,11 @@ class _AuthPageState extends State<AuthPage> {
   }
 
   Future<void> _verifySmsCode() async {
+    if (FirebaseAuthService.isAuthenticated) {
+      await _handlePhoneAuthSuccess();
+      return;
+    }
+
     if (!_smsFormKey.currentState!.validate()) {
       return;
     }
@@ -654,32 +713,7 @@ class _AuthPageState extends State<AuthPage> {
       );
 
       if (userCredential != null) {
-        // バックグラウンドで同期処理を実行（画面を閉じる前に開始）
-        _syncDataInBackground();
-        
-        if (mounted) {
-          // 成功メッセージを表示
-          final loginMethod =
-              FirebaseAuthService.loginMethod ?? _t('電話番号', 'Phone');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                _t(
-                  '$loginMethodでクラウドに保存しました',
-                  'Saved to cloud with $loginMethod',
-                ),
-              ),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
-            ),
-          );
-          // オーバーレイの場合はonCloseを使用、通常のナビゲーションの場合はpop
-          if (widget.onClose != null) {
-            widget.onClose!();
-          } else {
-            Navigator.of(context).pop(true);
-          }
-        }
+        await _handlePhoneAuthSuccess();
       } else {
         setState(() {
           _errorMessage =
@@ -687,6 +721,11 @@ class _AuthPageState extends State<AuthPage> {
         });
       }
     } on FirebaseAuthException catch (e) {
+      if (e.code == 'session-expired' && FirebaseAuthService.isAuthenticated) {
+        await _handlePhoneAuthSuccess();
+        return;
+      }
+
       // Firebase認証エラーの詳細な処理
       String errorMsg =
           _t('SMSコードの認証に失敗しました', 'SMS code verification failed.');
@@ -823,6 +862,8 @@ class _AuthPageState extends State<AuthPage> {
   }
 
   void _resetAuthMethod() {
+    _awaitingPhoneAuthResult = false;
+    _authSuccessHandled = false;
     setState(() {
       _isLoading = false;
       _busyAction = _AuthBusyAction.none;
@@ -1611,8 +1652,11 @@ class _AuthPageState extends State<AuthPage> {
                         const SizedBox(height: 8),
                         TextButton(
                           onPressed: _isLoading ? null : () {
+                              _awaitingPhoneAuthResult = false;
+                              _authSuccessHandled = false;
                               setState(() {
                                 _isSmsCodeSent = false;
+                                _verificationId = null;
                                 _smsCodeController.clear();
                                 _errorMessage = null;
                               });

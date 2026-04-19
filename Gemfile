@@ -5,6 +5,8 @@ gem "abbrev"
 gem "ostruct"
 # Ruby 3.4+ で default gems から外れた kconv を提供（CFPropertyList が require する）
 gem "nkf"
+# Ruby 4.1 以降でも molinillo の warning を避ける
+gem "tsort"
 
 # joymath と揃える（挙動差分を減らす）
 gem "fastlane", "2.231.1"
