@@ -21,7 +21,8 @@ import '../common/tablet_utils.dart';
 import '../../widgets/home/background_image_widget.dart';
 import '../gacha/pages/unit_gacha_page.dart';
 import '../gacha/formatting/unit_formatters.dart';
-import '../gacha/ui/builders/answer_display_builder.dart' show AnswerDisplayBuilder;
+import '../gacha/ui/builders/answer_display_builder.dart'
+    show AnswerDisplayBuilder;
 import '../gacha/ui/builders/problem_card_builder.dart' show ProblemCardBuilder;
 
 /// チュートリアルページ
@@ -90,17 +91,55 @@ class _TutorialPageState extends State<TutorialPage> {
 
   void _startHighlightAnimation() {
     _highlightTimer?.cancel();
-    if (_currentStep == 2) { // 3/4ページの場合のみ
+    if (_currentStep == 2) {
+      // 3/4ページの場合のみ
       int index = 0;
       // シーケンス: m点灯(0.6秒) → 通常(0.3秒) → s^-1点灯(0.6秒) → 通常(0.3秒) → s^-1点灯(0.6秒) → 通常(0.3秒) → 確定ボタン点灯(0.6秒) → ボタン無効化状態(1.2秒) → リセット(0.3秒) → ループ
       // 各要素は0.3秒間隔
-      final buttonSequence = ['m', 'm', null, 's^-1', 's^-1', null, 's^-1', 's^-1', null, 'confirm', 'confirm', 'disabled', 'disabled', 'disabled', 'disabled', null];
-      final textSequence = ['m ', 'm ', 'm ', 'm s^-1 ', 'm s^-1 ', 'm s^-1 ', 'm s^-2 ', 'm s^-2 ', 'm s^-2 ', 'm s^-2 ', 'm s^-2 ', '', '', '', '', ''];
-      _highlightTimer = Timer.periodic(const Duration(milliseconds: 300), (timer) {
+      final buttonSequence = [
+        'm',
+        'm',
+        null,
+        's^-1',
+        's^-1',
+        null,
+        's^-1',
+        's^-1',
+        null,
+        'confirm',
+        'confirm',
+        'disabled',
+        'disabled',
+        'disabled',
+        'disabled',
+        null,
+      ];
+      final textSequence = [
+        'm ',
+        'm ',
+        'm ',
+        'm s^-1 ',
+        'm s^-1 ',
+        'm s^-1 ',
+        'm s^-2 ',
+        'm s^-2 ',
+        'm s^-2 ',
+        'm s^-2 ',
+        'm s^-2 ',
+        '',
+        '',
+        '',
+        '',
+        '',
+      ];
+      _highlightTimer = Timer.periodic(const Duration(milliseconds: 300), (
+        timer,
+      ) {
         if (mounted) {
           setState(() {
             final button = buttonSequence[index];
-            _highlightedButtonText = (button == 'confirm' || button == 'disabled') ? null : button;
+            _highlightedButtonText =
+                (button == 'confirm' || button == 'disabled') ? null : button;
             _highlightConfirmButton = (button == 'confirm');
             _disableButtons = (button == 'disabled');
             _displayText = textSequence[index];
@@ -126,7 +165,7 @@ class _TutorialPageState extends State<TutorialPage> {
 
     // 正解の単位を計算
     final correctUnit = NormalizedUnit.fromString(_tutorialProblem.answer);
-    
+
     // 入力と正解を比較
     bool isCorrect;
     try {
@@ -188,14 +227,20 @@ class _TutorialPageState extends State<TutorialPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.purple,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 16,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
                 child: Text(
                   _isEnglishUi ? 'OK' : 'OK',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -210,56 +255,15 @@ class _TutorialPageState extends State<TutorialPage> {
     try {
       final status = isCorrect ? ProblemStatus.solved : ProblemStatus.failed;
       debugPrint('チュートリアル履歴保存開始: isCorrect=$isCorrect, status=$status');
-      
-      final history = await SimpleDataManager.getLearningHistory(_tutorialMathProblem);
-      debugPrint('既存の履歴を取得: ${history.length}件');
-      
-      final current = <Map<String, dynamic>>[];
 
-      const slotCount = 3;
-      for (var i = 0; i < slotCount; i++) {
-        if (i < history.length) {
-          final h = history[i];
-          final status = ProblemStatus.values.firstWhere(
-            (s) => s.name == h['status'],
-            orElse: () => ProblemStatus.none,
-          );
-          final timeStr = h['time'] as String?;
-          current.add({'status': status, 'time': timeStr});
-        } else {
-          current.add({'status': ProblemStatus.none, 'time': null});
-        }
-      }
-
-      // 最初の空いているスロットを見つける
-      int targetSlot = -1;
-      for (var i = 0; i < slotCount; i++) {
-        final slotStatus = current[i]['status'] as ProblemStatus;
-        if (slotStatus == ProblemStatus.none) {
-          targetSlot = i;
-          break;
-        }
-      }
-
-      if (targetSlot == -1) {
-        targetSlot = 0;
-      }
-
-      debugPrint('保存先スロット: $targetSlot');
-
-      // 新しい記録をスロットに保存
-      final t = DateTime.now().toIso8601String();
-      current[targetSlot] = {'status': status, 'time': t};
-
-      // 保存したスロットより後ろをクリア
-      for (var j = targetSlot + 1; j < current.length; j++) {
-        current[j] = {'status': ProblemStatus.none, 'time': null};
-      }
-
-      // SimpleDataManagerに保存（チュートリアル用の特別なメソッドを使用）
-      final success = await SimpleDataManager.saveTutorialLearningHistory(_tutorialMathProblem, current);
+      final success = await SimpleDataManager.saveLearningRecord(
+        _tutorialMathProblem,
+        status,
+      );
       if (success) {
-        debugPrint('チュートリアル履歴保存成功: problemId=${_tutorialMathProblem.id}, status=$status, time=$t');
+        debugPrint(
+          'チュートリアル履歴保存成功: problemId=${_tutorialMathProblem.id}, status=$status, time=$t',
+        );
       } else {
         debugPrint('警告: チュートリアル履歴保存が失敗しました');
       }
@@ -351,12 +355,18 @@ class _TutorialPageState extends State<TutorialPage> {
                   // タイトル
                   Text(
                     _currentStep == 0
-                        ? (_isEnglishUi ? 'Welcome to Unit Gacha!' : 'Unit Gachaへようこそ！')
+                        ? (_isEnglishUi
+                              ? 'Welcome to Unit Gacha!'
+                              : 'Unit Gachaへようこそ！')
                         : _currentStep == 1
-                            ? (_isEnglishUi ? 'How to Answer Unit Problems' : '単位問題の解答方法')
-                            : _currentStep == 2
-                                ? (_isEnglishUi ? 'Calculator Input and Exponent Laws' : '電卓入力と指数法則')
-                                : (_isEnglishUi ? 'Try the Problem' : '問題に挑戦'),
+                        ? (_isEnglishUi
+                              ? 'How to Answer Unit Problems'
+                              : '単位問題の解答方法')
+                        : _currentStep == 2
+                        ? (_isEnglishUi
+                              ? 'Calculator Input and Exponent Laws'
+                              : '電卓入力と指数法則')
+                        : (_isEnglishUi ? 'Try the Problem' : '問題に挑戦'),
                     style: TextStyle(
                       fontSize: _isEnglishUi ? 30 : 28,
                       fontWeight: FontWeight.bold,
@@ -379,14 +389,20 @@ class _TutorialPageState extends State<TutorialPage> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                                vertical: 16,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
                             child: Text(
                               _isEnglishUi ? 'Back' : '戻る',
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         if (_currentStep > 0) const SizedBox(width: 16),
@@ -396,14 +412,20 @@ class _TutorialPageState extends State<TutorialPage> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.purple,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 32,
+                              vertical: 16,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                           child: Text(
                             _isEnglishUi ? 'Next' : '次へ',
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -570,19 +592,19 @@ class _TutorialPageState extends State<TutorialPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-                    Text(
-                      _isEnglishUi ? 'About This App' : 'このアプリについて',
-                      style: TextStyle(
-                        fontSize: _isEnglishUi ? 22 : 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[900],
-                      ),
-                    ),
+              Text(
+                _isEnglishUi ? 'About This App' : 'このアプリについて',
+                style: TextStyle(
+                  fontSize: _isEnglishUi ? 22 : 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[900],
+                ),
+              ),
               const SizedBox(height: 16),
               _isEnglishUi
                   ? Text(
                       'Unit Gacha is an app for learning physics units.\n\n'
-                          'Derive units from formulas and answer by entering units using the calculator.',
+                      'Derive units from formulas and answer by entering units using the calculator.',
                       style: TextStyle(
                         fontSize: 18,
                         color: Colors.grey[800],
@@ -609,9 +631,7 @@ class _TutorialPageState extends State<TutorialPage> {
                               height: 1.6,
                             ),
                           ),
-                          const TextSpan(
-                            text: 'で解答します。',
-                          ),
+                          const TextSpan(text: 'で解答します。'),
                         ],
                       ),
                     ),
@@ -670,13 +690,15 @@ class _TutorialPageState extends State<TutorialPage> {
 
   Widget _buildProblemSection() {
     // Home（unit gacha）と同じカード幅レンジに合わせる（layout_builder.dart の通常モードと同等）
-    final baseCardWidth =
-        (MediaQuery.of(context).size.width - 48).clamp(280.0, 360.0);
+    final baseCardWidth = (MediaQuery.of(context).size.width - 48).clamp(
+      280.0,
+      360.0,
+    );
     final item = UnitGachaItem(
       exprProblem: gravityAccelerationExprProblem,
       unitProblem: _tutorialProblem,
     );
-    
+
     return Column(
       children: [
         // 問題カード
@@ -722,14 +744,20 @@ class _TutorialPageState extends State<TutorialPage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 16,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
               child: Text(
                 _isEnglishUi ? 'Back' : '戻る',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],

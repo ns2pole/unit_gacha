@@ -32,8 +32,6 @@ import 'auth_page.dart';
 import '../gacha/pages/unit_gacha_page.dart';
 import '../gacha/data/unit_gacha_history.dart' show UnitGachaHistoryManager;
 
-const int _slotCount = 3;
-
 enum AnswerDisplayMode { none, answer, explanation }
 
 // iPad検出用のヘルパー関数（エクスポート）
@@ -47,12 +45,12 @@ bool isIPad(BuildContext context) {
 
 // ツールタイプのenum（エクスポート）
 enum DrawingTool {
-  text,          // テキストツール
-  pen,           // 太いペン
-  marker,        // ハイライター
-  strokeEraser,   // ストローク消しゴム（ストローク全体を削除）
-  partialEraser,  // 部分消しゴム（部分削除）
-  lasso,         // ラッソ選択ツール
+  text, // テキストツール
+  pen, // 太いペン
+  marker, // ハイライター
+  strokeEraser, // ストローク消しゴム（ストローク全体を削除）
+  partialEraser, // 部分消しゴム（部分削除）
+  lasso, // ラッソ選択ツール
 }
 
 class ScratchPaperPage extends StatefulWidget {
@@ -65,7 +63,8 @@ class ScratchPaperPage extends StatefulWidget {
   State<ScratchPaperPage> createState() => _ScratchPaperPageState();
 }
 
-class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBindingObserver {
+class _ScratchPaperPageState extends State<ScratchPaperPage>
+    with WidgetsBindingObserver {
   final GlobalKey _paintKey = GlobalKey();
   List<DrawingPoint> _points = [];
   List<List<DrawingPoint>> _strokes = [];
@@ -84,7 +83,7 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
   LearningStatus _learningStatus = LearningStatus.none;
   bool _isLearningStatusPressed = false;
   bool _isSavePressed = false;
-  
+
   // 学習履歴オプションは常に有効
   bool _isHistoryEnabled = true;
   late AppLocalizations _l10n;
@@ -97,7 +96,7 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
   bool _isPaletteVisible = true; // パレットを完全に非表示にするか
   Offset _palettePosition = const Offset(0, 0); // 初期化時に設定
   bool _isPaletteDragging = false;
-  
+
   // オブジェクト選択関連
   Set<int> _selectedStrokeIndices = {}; // 選択されたストロークのインデックス（複数選択対応）
   Offset? _selectionStart; // 輪っか選択の開始位置
@@ -139,34 +138,34 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     if (pressure <= 0.0) {
       return _currentStrokeWidth; // デフォルト値（筆圧なし）
     }
-    
-          // ツールに応じた最小/最大幅を設定
-          double minWidth;
-          double maxWidth;
-          
-          switch (_currentTool) {
-            case DrawingTool.text:
-              minWidth = 1.0;
-              maxWidth = 3.0;
-              break;
-            case DrawingTool.pen:
-              minWidth = 1.0;
-              maxWidth = 4.0;
-              break;
-            case DrawingTool.marker:
-              minWidth = 6.0;
-              maxWidth = 15.0;
-              break;
-            case DrawingTool.strokeEraser:
-            case DrawingTool.partialEraser:
-              minWidth = 10.0;
-              maxWidth = 30.0;
-              break;
-            case DrawingTool.lasso:
-              // ラッソ選択ツールは描画しないので、デフォルト値を返す
-              return _currentStrokeWidth;
-          }
-    
+
+    // ツールに応じた最小/最大幅を設定
+    double minWidth;
+    double maxWidth;
+
+    switch (_currentTool) {
+      case DrawingTool.text:
+        minWidth = 1.0;
+        maxWidth = 3.0;
+        break;
+      case DrawingTool.pen:
+        minWidth = 1.0;
+        maxWidth = 4.0;
+        break;
+      case DrawingTool.marker:
+        minWidth = 6.0;
+        maxWidth = 15.0;
+        break;
+      case DrawingTool.strokeEraser:
+      case DrawingTool.partialEraser:
+        minWidth = 10.0;
+        maxWidth = 30.0;
+        break;
+      case DrawingTool.lasso:
+        // ラッソ選択ツールは描画しないので、デフォルト値を返す
+        return _currentStrokeWidth;
+    }
+
     // 筆圧値（0.0〜1.0）を線幅にマッピング
     return minWidth + (pressure * (maxWidth - minWidth));
   }
@@ -178,7 +177,9 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     WidgetsBinding.instance.addObserver(this);
 
     // Notifier 初期化（初期ツールは pen または _isEraser/_isScrollMode に合わせる）
-    final initialTool = _isEraser ? 'eraser' : (_isScrollMode ? 'scroll' : 'pen');
+    final initialTool = _isEraser
+        ? 'eraser'
+        : (_isScrollMode ? 'scroll' : 'pen');
     _activeToolNotifier = ValueNotifier<String>(initialTool);
     _isDrawingNotifier = ValueNotifier<bool>(false);
 
@@ -198,7 +199,6 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
       }
     });
   }
-  
 
   @override
   void didChangeDependencies() {
@@ -242,7 +242,7 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     // 画面の中央に配置（ペン、消しゴム、スクロールを横並び）
     final centerX = screenSize.width / 2;
     final centerY = screenSize.height / 2;
-    
+
     // 消しゴムボタンを中央に配置
     final eraserX = centerX - buttonSize / 2;
     final eraserY = centerY - buttonSize / 2;
@@ -264,19 +264,19 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     final savedY = prefs.getDouble('ipad_palette_y');
     final savedExpanded = prefs.getBool('ipad_palette_expanded');
     final savedVisible = prefs.getBool('ipad_palette_visible');
-    
+
     if (mounted) {
       final screenSize = MediaQuery.of(context).size;
-      
+
       // まず展開状態を読み込む（位置計算に必要）
       if (savedExpanded != null) {
         setState(() {
           _isPaletteExpanded = savedExpanded;
         });
       }
-      
+
       final paletteWidth = _isPaletteExpanded ? 600.0 : 56.0;
-      
+
       if (savedX != null && savedY != null) {
         // 既存データを読み込み（左上位置ベースとして扱う）
         // 既存データが中心点ベースの場合、最初は位置がずれる可能性があるが、
@@ -287,10 +287,13 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
       } else {
         // デフォルト位置（画面下部中央、左上位置ベース）
         setState(() {
-          _palettePosition = Offset(screenSize.width / 2 - paletteWidth / 2, 100);
+          _palettePosition = Offset(
+            screenSize.width / 2 - paletteWidth / 2,
+            100,
+          );
         });
       }
-      
+
       if (savedVisible != null) {
         setState(() {
           _isPaletteVisible = savedVisible;
@@ -324,7 +327,6 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
         needsInitialize = true;
       }
 
-
       if (needsInitialize && mounted) {
         // 保存された位置を削除して初期位置にリセット
         await _resetButtonPositions();
@@ -350,8 +352,14 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setDouble('scratch_paper_pen_button_x', _penButtonPosition.dx);
-      await prefs.setDouble('scratch_paper_pen_button_y', _penButtonPosition.dy);
+      await prefs.setDouble(
+        'scratch_paper_pen_button_x',
+        _penButtonPosition.dx,
+      );
+      await prefs.setDouble(
+        'scratch_paper_pen_button_y',
+        _penButtonPosition.dy,
+      );
     } catch (e) {
       print('Error saving button positions: $e');
     }
@@ -379,11 +387,11 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
         // 画面の中央に配置（ペン、消しゴム、スクロールを横並び）
         final centerX = screenSize.width / 2;
         final centerY = screenSize.height / 2;
-        
+
         // 消しゴムボタンを中央に配置
         final eraserX = centerX - buttonSize / 2;
         final eraserY = centerY - buttonSize / 2;
-        
+
         // ペンボタンの位置（消しゴムの左）
         final penX = eraserX - buttonSize - spacing;
         final penY = eraserY;
@@ -413,343 +421,646 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
         Scaffold(
           backgroundColor: Colors.white,
           appBar: AppBar(
-        backgroundColor: Colors.blue[600],
-        foregroundColor: Colors.white,
-        elevation: 0,
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              if (Navigator.of(context).canPop()) {
-                Navigator.of(context).pop();
-              }
-            },
-            tooltip: '戻る',
-          ),
-        ),
-        title: StreamBuilder(
-          stream: FirebaseAuthService.authStateChanges,
-          builder: (context, snapshot) {
-            final isAuthenticated = FirebaseAuthService.isAuthenticated;
-            final userEmail = FirebaseAuthService.userEmail;
-            final userPhoneNumber = FirebaseAuthService.userPhoneNumber;
-            final displayName = FirebaseAuthService.displayName;
-            final loginMethod = FirebaseAuthService.loginMethod;
-            
-            return Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _l10n.fingerDrawing,
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-                if (isAuthenticated) ...[
-                  // アカウントアイコン（ログアウトボタン付き）
-                  PopupMenuButton<String>(
-                    iconSize: 24.0,
-                    icon: Icon(
-                      Icons.account_circle,
-                      color: Colors.white,
-                      size: 24.0,
+            backgroundColor: Colors.blue[600],
+            foregroundColor: Colors.white,
+            elevation: 0,
+            leading: Builder(
+              builder: (context) => IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  }
+                },
+                tooltip: '戻る',
+              ),
+            ),
+            title: StreamBuilder(
+              stream: FirebaseAuthService.authStateChanges,
+              builder: (context, snapshot) {
+                final isAuthenticated = FirebaseAuthService.isAuthenticated;
+                final userEmail = FirebaseAuthService.userEmail;
+                final userPhoneNumber = FirebaseAuthService.userPhoneNumber;
+                final displayName = FirebaseAuthService.displayName;
+                final loginMethod = FirebaseAuthService.loginMethod;
+
+                return Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _l10n.fingerDrawing,
+                        style: TextStyle(color: Colors.white),
+                      ),
                     ),
-                    onSelected: (value) async {
-                      if (value == 'logout') {
-                        await FirebaseAuthService.signOut();
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('ログアウトしました'),
-                              backgroundColor: Colors.green,
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                          setState(() {});
-                        }
-                      }
-                    },
-                    itemBuilder: (context) {
-                      String? accountInfo;
-                      if (userPhoneNumber != null && userPhoneNumber.isNotEmpty) {
-                        accountInfo = userPhoneNumber;
-                      } else if (userEmail != null && userEmail.isNotEmpty) {
-                        accountInfo = userEmail;
-                      } else if (displayName != null && displayName.isNotEmpty) {
-                        accountInfo = displayName;
-                      }
-                      
-                      return [
-                        if (accountInfo != null)
-                          PopupMenuItem(
-                            enabled: false,
-                            child: Text(
-                              accountInfo,
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                              softWrap: true,
-                              overflow: TextOverflow.visible,
-                            ),
-                          ),
-                        if (loginMethod != null)
-                          PopupMenuItem(
-                            enabled: false,
-                            child: Row(
-                              children: [
-                                Icon(Icons.login, size: 16, color: Colors.grey),
-                                SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    '$loginMethodでクラウドを利用中',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey[600],
-                                    ),
-                                    softWrap: true,
-                                    overflow: TextOverflow.visible,
-                                  ),
+                    if (isAuthenticated) ...[
+                      // アカウントアイコン（ログアウトボタン付き）
+                      PopupMenuButton<String>(
+                        iconSize: 24.0,
+                        icon: Icon(
+                          Icons.account_circle,
+                          color: Colors.white,
+                          size: 24.0,
+                        ),
+                        onSelected: (value) async {
+                          if (value == 'logout') {
+                            await FirebaseAuthService.signOut();
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('ログアウトしました'),
+                                  backgroundColor: Colors.green,
+                                  duration: Duration(seconds: 2),
                                 ),
-                              ],
+                              );
+                              setState(() {});
+                            }
+                          }
+                        },
+                        itemBuilder: (context) {
+                          String? accountInfo;
+                          if (userPhoneNumber != null &&
+                              userPhoneNumber.isNotEmpty) {
+                            accountInfo = userPhoneNumber;
+                          } else if (userEmail != null &&
+                              userEmail.isNotEmpty) {
+                            accountInfo = userEmail;
+                          } else if (displayName != null &&
+                              displayName.isNotEmpty) {
+                            accountInfo = displayName;
+                          }
+
+                          return [
+                            if (accountInfo != null)
+                              PopupMenuItem(
+                                enabled: false,
+                                child: Text(
+                                  accountInfo,
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                  softWrap: true,
+                                  overflow: TextOverflow.visible,
+                                ),
+                              ),
+                            if (loginMethod != null)
+                              PopupMenuItem(
+                                enabled: false,
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.login,
+                                      size: 16,
+                                      color: Colors.grey,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Flexible(
+                                      child: Text(
+                                        '$loginMethodでクラウドを利用中',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey[600],
+                                        ),
+                                        softWrap: true,
+                                        overflow: TextOverflow.visible,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            const PopupMenuItem(
+                              value: 'logout',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.logout, size: 20),
+                                  SizedBox(width: 8),
+                                  Text('ログアウト'),
+                                ],
+                              ),
                             ),
+                          ];
+                        },
+                      ),
+                    ] else ...[
+                      // クラウドボタン（ログインしていない場合）
+                      Material(
+                        color: Colors.transparent,
+                        child: IconButton(
+                          iconSize: 24.0,
+                          icon: Icon(
+                            Icons.cloud_outlined,
+                            color: Colors.white,
+                            size: 24.0,
                           ),
-                        const PopupMenuItem(
-                          value: 'logout',
-                          child: Row(
-                            children: [
-                              Icon(Icons.logout, size: 20),
-                              SizedBox(width: 8),
-                              Text('ログアウト'),
-                            ],
+                          onPressed: () async {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const AuthPage(),
+                              ),
+                            );
+                            if (result == true && mounted) {
+                              setState(() {});
+                            }
+                          },
+                          tooltip: 'ログイン',
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+              },
+            ),
+            actionsIconTheme: const IconThemeData(size: 24),
+            actions: [
+              // --- 統一された spacing / padding を使う AppBar actions ---アイコンが多いので間隔に注意
+              Builder(
+                builder: (context) {
+                  // 変更：少し詰める（マイルド）
+                  final screenSize = MediaQuery.of(context).size;
+                  final isMobile = screenSize.width < 600;
+                  // アイコン自体はそのまま、間隔だけ小さくする
+                  final iconSize = isMobile ? 20.0 : 28.0;
+                  // B より少し詰める -> mobile 8px / desktop 10px
+                  final iconSpacing = isMobile ? 0.0 : 10.0;
+                  // 右端パディングを少し小さく
+                  final endRightPadding = isMobile ? 16.0 : 18.0;
+                  // 内側余白を小さめに（タップ領域はまだ十分）
+                  final commonIconPadding = EdgeInsets.all(isMobile ? 0 : 6.0);
+                  // 見た目の最小領域（幅/高さ）も少し詰める
+                  final commonIconConstraints = BoxConstraints(
+                    minWidth: iconSize + (isMobile ? 8.0 : 12.0),
+                    minHeight: iconSize + (isMobile ? 8.0 : 12.0),
+                  );
+
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // グループ1: 全消し / 元に戻す / やり直し
+                      IconButton(
+                        icon: Icon(Icons.autorenew, size: iconSize),
+                        onPressed: _clearCanvas,
+                        tooltip: '全消し',
+                        padding: commonIconPadding,
+                        constraints: commonIconConstraints,
+                      ),
+                      SizedBox(width: iconSpacing),
+                      IconButton(
+                        icon: Icon(Icons.undo, size: iconSize),
+                        onPressed: _undoLastStroke,
+                        tooltip: '元に戻す',
+                        padding: commonIconPadding,
+                        constraints: commonIconConstraints,
+                      ),
+                      SizedBox(width: iconSpacing),
+                      IconButton(
+                        icon: Icon(Icons.redo, size: iconSize),
+                        onPressed: _redoLastStroke,
+                        tooltip: 'やり直し',
+                        padding: commonIconPadding,
+                        constraints: commonIconConstraints,
+                      ),
+                      SizedBox(width: iconSpacing),
+
+                      // widget.problem の存在で以降のボタンを表示
+                      if (widget.problem != null) ...[
+                        // グループ2: ヒント / 解答 / 解説（3段階トグル）
+                        if (widget.problem != null &&
+                            widget.problem!.hint != null &&
+                            widget.problem!.hint!.isNotEmpty) ...[
+                          IconButton(
+                            icon: Icon(
+                              Icons.lightbulb_outline,
+                              color: _showHint ? Colors.orange : Colors.white,
+                              size: iconSize,
+                            ),
+                            onPressed: () =>
+                                setState(() => _showHint = !_showHint),
+                            tooltip: _showHint ? 'ヒントを隠す' : 'ヒントを表示',
+                            padding: commonIconPadding,
+                            constraints: commonIconConstraints,
+                          ),
+                          SizedBox(width: iconSpacing),
+                        ],
+                        IconButton(
+                          icon: Icon(
+                            _answerDisplayMode == AnswerDisplayMode.none
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: _answerDisplayMode == AnswerDisplayMode.none
+                                ? Colors.white
+                                : Colors.amber,
+                            size: iconSize,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              switch (_answerDisplayMode) {
+                                case AnswerDisplayMode.none:
+                                  _answerDisplayMode = AnswerDisplayMode.answer;
+                                  break;
+                                case AnswerDisplayMode.answer:
+                                  _answerDisplayMode =
+                                      AnswerDisplayMode.explanation;
+                                  break;
+                                case AnswerDisplayMode.explanation:
+                                  _answerDisplayMode = AnswerDisplayMode.none;
+                                  break;
+                              }
+                            });
+                          },
+                          tooltip: _answerDisplayMode == AnswerDisplayMode.none
+                              ? '解答を表示'
+                              : _answerDisplayMode == AnswerDisplayMode.answer
+                              ? '解説を表示'
+                              : '閉じる',
+                          padding: commonIconPadding,
+                          constraints: commonIconConstraints,
+                        ),
+                        SizedBox(width: iconSpacing),
+
+                        // グループ3: 学習ステータス / 保存
+                        GestureDetector(
+                          onTapDown: (_) =>
+                              setState(() => _isLearningStatusPressed = true),
+                          onTapUp: (_) =>
+                              setState(() => _isLearningStatusPressed = false),
+                          onTapCancel: () =>
+                              setState(() => _isLearningStatusPressed = false),
+                          onTap: _isHistoryEnabled
+                              ? _cycleLearningStatus
+                              : null,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 100),
+                            padding: EdgeInsets.all(isMobile ? 10.0 : 14.0),
+                            decoration: BoxDecoration(
+                              color: _isLearningStatusPressed
+                                  ? Colors.white.withOpacity(0.3)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Icon(
+                              _learningStatus.icon,
+                              color: _isHistoryEnabled
+                                  ? (_learningStatus == LearningStatus.none
+                                        ? Colors.white
+                                        : _learningStatus.color)
+                                  : Colors.grey[400]!,
+                              size: iconSize,
+                            ),
                           ),
                         ),
-                      ];
-                    },
-                  ),
-                ] else ...[
-                  // クラウドボタン（ログインしていない場合）
-                  Material(
-                    color: Colors.transparent,
-                    child: IconButton(
-                      iconSize: 24.0,
-                      icon: Icon(
-                        Icons.cloud_outlined,
-                        color: Colors.white,
-                        size: 24.0,
+                        SizedBox(width: iconSpacing),
+                        GestureDetector(
+                          onTapDown: (_) =>
+                              setState(() => _isSavePressed = true),
+                          onTapUp: (_) =>
+                              setState(() => _isSavePressed = false),
+                          onTapCancel: () =>
+                              setState(() => _isSavePressed = false),
+                          onTap:
+                              (_isHistoryEnabled &&
+                                  _learningStatus != LearningStatus.none)
+                              ? _saveLearningRecord
+                              : null,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 100),
+                            padding: EdgeInsets.all(isMobile ? 10.0 : 14.0),
+                            decoration: BoxDecoration(
+                              color: _isSavePressed
+                                  ? Colors.white.withOpacity(0.3)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Icon(
+                              Icons.save,
+                              color:
+                                  (_isHistoryEnabled &&
+                                      _learningStatus != LearningStatus.none)
+                                  ? Colors.white
+                                  : Colors.grey[400]!,
+                              size: iconSize,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: endRightPadding),
+                      ],
+                      // Gacha!ボタン（常に表示）
+                      SizedBox(width: iconSpacing),
+                      IconButton(
+                        icon: Icon(Icons.casino, size: iconSize),
+                        onPressed: () => _navigateToGacha(),
+                        tooltip: 'Gacha!',
+                        padding: commonIconPadding,
+                        constraints: commonIconConstraints,
                       ),
-                      onPressed: () async {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const AuthPage()),
-                        );
-                        if (result == true && mounted) {
-                          setState(() {});
-                        }
-                      },
-                      tooltip: 'ログイン',
-                    ),
-                  ),
-                ],
-              ],
-            );
-          },
-        ),
-        actionsIconTheme: const IconThemeData(size: 24),
-        actions: [
-          // --- 統一された spacing / padding を使う AppBar actions ---アイコンが多いので間隔に注意
-          Builder(builder: (context) {
-            // 変更：少し詰める（マイルド）
-            final screenSize = MediaQuery.of(context).size;
-            final isMobile = screenSize.width < 600;
-            // アイコン自体はそのまま、間隔だけ小さくする
-            final iconSize = isMobile ? 20.0 : 28.0;
-            // B より少し詰める -> mobile 8px / desktop 10px
-            final iconSpacing = isMobile ? 0.0 : 10.0;
-            // 右端パディングを少し小さく
-            final endRightPadding = isMobile ? 16.0 : 18.0;
-            // 内側余白を小さめに（タップ領域はまだ十分）
-            final commonIconPadding = EdgeInsets.all(isMobile ? 0 : 6.0);
-            // 見た目の最小領域（幅/高さ）も少し詰める
-            final commonIconConstraints = BoxConstraints(
-              minWidth: iconSize + (isMobile ? 8.0 : 12.0),
-              minHeight: iconSize + (isMobile ? 8.0 : 12.0),
-            );
-
-            return Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // グループ1: 全消し / 元に戻す / やり直し
-                IconButton(
-                  icon: Icon(Icons.autorenew, size: iconSize),
-                  onPressed: _clearCanvas,
-                  tooltip: '全消し',
-                  padding: commonIconPadding,
-                  constraints: commonIconConstraints,
-                ),
-                SizedBox(width: iconSpacing),
-                IconButton(
-                  icon: Icon(Icons.undo, size: iconSize),
-                  onPressed: _undoLastStroke,
-                  tooltip: '元に戻す',
-                  padding: commonIconPadding,
-                  constraints: commonIconConstraints,
-                ),
-                SizedBox(width: iconSpacing),
-                IconButton(
-                  icon: Icon(Icons.redo, size: iconSize),
-                  onPressed: _redoLastStroke,
-                  tooltip: 'やり直し',
-                  padding: commonIconPadding,
-                  constraints: commonIconConstraints,
-                ),
-                SizedBox(width: iconSpacing),
-
-                // widget.problem の存在で以降のボタンを表示
-                if (widget.problem != null) ...[
-                  // グループ2: ヒント / 解答 / 解説（3段階トグル）
-                  if (widget.problem != null && widget.problem!.hint != null && widget.problem!.hint!.isNotEmpty) ...[
-                  IconButton(
-                    icon: Icon(
-                        Icons.lightbulb_outline,
-                        color: _showHint ? Colors.orange : Colors.white,
-                      size: iconSize,
-                    ),
-                      onPressed: () => setState(() => _showHint = !_showHint),
-                      tooltip: _showHint ? 'ヒントを隠す' : 'ヒントを表示',
-                    padding: commonIconPadding,
-                    constraints: commonIconConstraints,
-                  ),
-                  SizedBox(width: iconSpacing),
-                  ],
-                  IconButton(
-                    icon: Icon(
-                      _answerDisplayMode == AnswerDisplayMode.none
-                          ? Icons.visibility_off
-                          : Icons.visibility,
-                      color: _answerDisplayMode == AnswerDisplayMode.none
-                          ? Colors.white
-                          : Colors.amber,
-                      size: iconSize,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        switch (_answerDisplayMode) {
-                          case AnswerDisplayMode.none:
-                            _answerDisplayMode = AnswerDisplayMode.answer;
-                            break;
-                          case AnswerDisplayMode.answer:
-                            _answerDisplayMode = AnswerDisplayMode.explanation;
-                            break;
-                          case AnswerDisplayMode.explanation:
-                            _answerDisplayMode = AnswerDisplayMode.none;
-                            break;
-                        }
-                      });
-                    },
-                    tooltip: _answerDisplayMode == AnswerDisplayMode.none
-                        ? '解答を表示'
-                        : _answerDisplayMode == AnswerDisplayMode.answer
-                            ? '解説を表示'
-                            : '閉じる',
-                    padding: commonIconPadding,
-                    constraints: commonIconConstraints,
-                  ),
-                  SizedBox(width: iconSpacing),
-
-                  // グループ3: 学習ステータス / 保存
-                  GestureDetector(
-                    onTapDown: (_) => setState(() => _isLearningStatusPressed = true),
-                    onTapUp: (_) => setState(() => _isLearningStatusPressed = false),
-                    onTapCancel: () => setState(() => _isLearningStatusPressed = false),
-                    onTap: _isHistoryEnabled ? _cycleLearningStatus : null,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 100),
-                      padding: EdgeInsets.all(isMobile ? 10.0 : 14.0),
-                      decoration: BoxDecoration(
-                        color: _isLearningStatusPressed ? Colors.white.withOpacity(0.3) : Colors.transparent,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Icon(
-                        _learningStatus.icon,
-                        color: _isHistoryEnabled
-                            ? (_learningStatus == LearningStatus.none ? Colors.white : _learningStatus.color)
-                            : Colors.grey[400]!,
-                        size: iconSize,
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: iconSpacing),
-                  GestureDetector(
-                    onTapDown: (_) => setState(() => _isSavePressed = true),
-                    onTapUp: (_) => setState(() => _isSavePressed = false),
-                    onTapCancel: () => setState(() => _isSavePressed = false),
-                    onTap: (_isHistoryEnabled && _learningStatus != LearningStatus.none) ? _saveLearningRecord : null,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 100),
-                      padding: EdgeInsets.all(isMobile ? 10.0 : 14.0),
-                      decoration: BoxDecoration(
-                        color: _isSavePressed ? Colors.white.withOpacity(0.3) : Colors.transparent,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Icon(
-                        Icons.save,
-                        color: (_isHistoryEnabled && _learningStatus != LearningStatus.none)
-                            ? Colors.white
-                            : Colors.grey[400]!,
-                        size: iconSize,
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: endRightPadding),
-                ],
-                // Gacha!ボタン（常に表示）
-                SizedBox(width: iconSpacing),
-                IconButton(
-                  icon: Icon(Icons.casino, size: iconSize),
-                  onPressed: () => _navigateToGacha(),
-                  tooltip: 'Gacha!',
-                  padding: commonIconPadding,
-                  constraints: commonIconConstraints,
-                ),
-                SizedBox(width: endRightPadding),
-              ],
-            );
-          }),
-        ],
-        ),
-      body: Stack(
-        children: [
-          Column(
+                      SizedBox(width: endRightPadding),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
+          body: Stack(
             children: [
-              if (widget.problem != null) ...[
-                _answerDisplayMode != AnswerDisplayMode.none
-                    ? Expanded(
-                        child: SingleChildScrollView(
-                          controller: _verticalScrollController,
-                          child: Container(
-                            width: double.infinity,
+              Column(
+                children: [
+                  if (widget.problem != null) ...[
+                    _answerDisplayMode != AnswerDisplayMode.none
+                        ? Expanded(
+                            child: SingleChildScrollView(
+                              controller: _verticalScrollController,
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.only(
+                                  left: 16,
+                                  right: 16,
+                                  top: 12,
+                                  bottom: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[50],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 32),
+                                      child: Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: MixedTextMath(
+                                          widget.problem!.question,
+                                          labelStyle: const TextStyle(
+                                            fontSize: 18,
+                                          ),
+                                          mathStyle: const TextStyle(
+                                            fontSize: 24,
+                                          ),
+                                          forceTex: false,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    if (_answerDisplayMode ==
+                                            AnswerDisplayMode.answer ||
+                                        _answerDisplayMode ==
+                                            AnswerDisplayMode.explanation) ...[
+                                      const SizedBox(height: 16),
+                                      Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: MixedTextMath(
+                                          "【答え】",
+                                          labelStyle: const TextStyle(
+                                            fontSize: 19,
+                                          ),
+                                          mathStyle: const TextStyle(
+                                            fontSize: 22,
+                                          ),
+                                          forceTex: false,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: MixedTextMath(
+                                          widget.problem!.answer,
+                                          labelStyle: const TextStyle(
+                                            fontSize: 19,
+                                          ),
+                                          mathStyle: const TextStyle(
+                                            fontSize: 28,
+                                            color: Colors.green,
+                                          ),
+                                          forceTex: false,
+                                        ),
+                                      ),
+                                    ],
+                                    if (_showHint &&
+                                        widget.problem!.hint != null &&
+                                        widget.problem!.hint!.isNotEmpty) ...[
+                                      const SizedBox(height: 20),
+                                      Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.all(16),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orange[50],
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          border: Border.all(
+                                            color: Colors.orange[200]!,
+                                          ),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Align(
+                                              alignment: Alignment.centerLeft,
+                                              child: MixedTextMath(
+                                                "【ヒント】",
+                                                labelStyle: const TextStyle(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                                mathStyle: const TextStyle(
+                                                  fontSize: 20,
+                                                ),
+                                                forceTex: false,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 12),
+                                            Align(
+                                              alignment: Alignment.centerLeft,
+                                              child: MixedTextMath(
+                                                widget.problem!.hint!,
+                                                forceTex: true,
+                                                labelStyle: const TextStyle(
+                                                  fontSize: 18,
+                                                ),
+                                                mathStyle: const TextStyle(
+                                                  fontSize: 20,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                    if (_answerDisplayMode ==
+                                        AnswerDisplayMode.explanation) ...[
+                                      const SizedBox(height: 16),
+                                      if (widget.problem!.imageAsset !=
+                                          null) ...[
+                                        FutureBuilder<bool>(
+                                          future: _assetExists(
+                                            widget.problem!.imageAsset!,
+                                          ),
+                                          builder: (ctx, snap) {
+                                            if (snap.connectionState !=
+                                                ConnectionState.done) {
+                                              return const SizedBox.shrink();
+                                            }
+                                            if (snap.hasData &&
+                                                snap.data == true) {
+                                              return LayoutBuilder(
+                                                builder: (context, constraints) {
+                                                  final maxWidth =
+                                                      MediaQuery.of(
+                                                        context,
+                                                      ).size.width *
+                                                      0.7;
+                                                  return ConstrainedBox(
+                                                    constraints: BoxConstraints(
+                                                      maxWidth: maxWidth,
+                                                    ),
+                                                    child: Image.asset(
+                                                      widget
+                                                          .problem!
+                                                          .imageAsset!,
+                                                      fit: BoxFit.contain,
+                                                      errorBuilder:
+                                                          (
+                                                            context,
+                                                            error,
+                                                            stackTrace,
+                                                          ) =>
+                                                              const SizedBox.shrink(),
+                                                    ),
+                                                  );
+                                                },
+                                              );
+                                            } else {
+                                              return const SizedBox.shrink();
+                                            }
+                                          },
+                                        ),
+                                        const SizedBox(height: 12),
+                                      ],
+                                      ...widget.problem!.steps.map((s) {
+                                        return Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 8.0,
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              if (s.tex != null &&
+                                                  s.tex!.trim().isNotEmpty)
+                                                Align(
+                                                  alignment:
+                                                      Alignment.centerLeft,
+                                                  child: MixedTextMath(
+                                                    s.tex!,
+                                                    forceTex: true,
+                                                    labelStyle: const TextStyle(
+                                                      fontSize: 20,
+                                                    ),
+                                                    mathStyle: const TextStyle(
+                                                      fontSize: 22,
+                                                    ),
+                                                  ),
+                                                ),
+                                              if (s.imageAsset != null)
+                                                FutureBuilder<bool>(
+                                                  future: _assetExists(
+                                                    s.imageAsset!,
+                                                  ),
+                                                  builder: (ctx, snap) {
+                                                    if (snap.connectionState !=
+                                                        ConnectionState.done) {
+                                                      return const SizedBox.shrink();
+                                                    }
+                                                    if (snap.hasData &&
+                                                        snap.data == true) {
+                                                      return Column(
+                                                        children: [
+                                                          const SizedBox(
+                                                            height: 6,
+                                                          ),
+                                                          Center(
+                                                            child: ConstrainedBox(
+                                                              constraints:
+                                                                  const BoxConstraints(
+                                                                    maxHeight:
+                                                                        400,
+                                                                  ),
+                                                              child: Image.asset(
+                                                                s.imageAsset!,
+                                                                fit: BoxFit
+                                                                    .contain,
+                                                                errorBuilder:
+                                                                    (
+                                                                      context,
+                                                                      error,
+                                                                      stackTrace,
+                                                                    ) =>
+                                                                        const SizedBox.shrink(),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      );
+                                                    } else {
+                                                      return const SizedBox.shrink();
+                                                    }
+                                                  },
+                                                ),
+                                            ],
+                                          ),
+                                        );
+                                      }).toList(),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          )
+                        : Container(
                             padding: const EdgeInsets.only(
                               left: 16,
                               right: 16,
                               top: 12,
                               bottom: 8,
                             ),
-                            decoration: BoxDecoration(color: Colors.grey[50]),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[50],
+                              border: Border(
+                                bottom: BorderSide(color: Colors.grey[300]!),
+                              ),
+                            ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 32),
-                                  child: Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: MixedTextMath(
-                                      widget.problem!.question,
-                                      labelStyle: const TextStyle(fontSize: 18),
-                                      mathStyle: const TextStyle(fontSize: 24),
-                                      forceTex: false,
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(
+                                          left: 32,
+                                        ),
+                                        child: Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: MixedTextMath(
+                                            widget.problem!.question,
+                                            labelStyle: const TextStyle(
+                                              fontSize: 18,
+                                            ),
+                                            mathStyle: const TextStyle(
+                                              fontSize: 24,
+                                            ),
+                                            forceTex: false,
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ),
                                 const SizedBox(height: 4),
-                                if (_answerDisplayMode == AnswerDisplayMode.answer || _answerDisplayMode == AnswerDisplayMode.explanation) ...[
+                                if (_answerDisplayMode ==
+                                        AnswerDisplayMode.answer ||
+                                    _answerDisplayMode ==
+                                        AnswerDisplayMode.explanation) ...[
                                   const SizedBox(height: 16),
                                   Align(
                                     alignment: Alignment.centerLeft,
@@ -774,25 +1085,35 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
                                     ),
                                   ),
                                 ],
-                                if (_showHint && widget.problem!.hint != null && widget.problem!.hint!.isNotEmpty) ...[
-                                  const SizedBox(height: 20),
+                                if (_showHint &&
+                                    widget.problem!.hint != null &&
+                                    widget.problem!.hint!.isNotEmpty) ...[
+                                  const SizedBox(height: 16),
                                   Container(
                                     width: double.infinity,
                                     padding: const EdgeInsets.all(16),
                                     decoration: BoxDecoration(
                                       color: Colors.orange[50],
                                       borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: Colors.orange[200]!),
+                                      border: Border.all(
+                                        color: Colors.orange[200]!,
+                                      ),
                                     ),
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Align(
                                           alignment: Alignment.centerLeft,
                                           child: MixedTextMath(
                                             "【ヒント】",
-                                            labelStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                                            mathStyle: const TextStyle(fontSize: 20),
+                                            labelStyle: const TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            mathStyle: const TextStyle(
+                                              fontSize: 20,
+                                            ),
                                             forceTex: false,
                                           ),
                                         ),
@@ -802,283 +1123,69 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
                                           child: MixedTextMath(
                                             widget.problem!.hint!,
                                             forceTex: true,
-                                            labelStyle: const TextStyle(fontSize: 18),
-                                            mathStyle: const TextStyle(fontSize: 20),
+                                            labelStyle: const TextStyle(
+                                              fontSize: 18,
+                                            ),
+                                            mathStyle: const TextStyle(
+                                              fontSize: 20,
+                                            ),
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
                                 ],
-                                if (_answerDisplayMode == AnswerDisplayMode.explanation) ...[
-                                  const SizedBox(height: 16),
-                                  if (widget.problem!.imageAsset != null) ...[
-                                    FutureBuilder<bool>(
-                                      future: _assetExists(
-                                        widget.problem!.imageAsset!,
-                                      ),
-                                      builder: (ctx, snap) {
-                                        if (snap.connectionState !=
-                                            ConnectionState.done) {
-                                          return const SizedBox.shrink();
-                                        }
-                                        if (snap.hasData && snap.data == true) {
-                                          return LayoutBuilder(
-                                            builder: (context, constraints) {
-                                              final maxWidth =
-                                                  MediaQuery.of(
-                                                    context,
-                                                  ).size.width *
-                                                  0.7;
-                                              return ConstrainedBox(
-                                                constraints: BoxConstraints(
-                                                  maxWidth: maxWidth,
-                                                ),
-                                                child: Image.asset(
-                                                  widget.problem!.imageAsset!,
-                                                  fit: BoxFit.contain,
-                                                  errorBuilder:
-                                                      (
-                                                        context,
-                                                        error,
-                                                        stackTrace,
-                                                      ) =>
-                                                          const SizedBox.shrink(),
-                                                ),
-                                              );
-                                            },
-                                          );
-                                        } else {
-                                          return const SizedBox.shrink();
-                                        }
-                                      },
-                                    ),
-                                    const SizedBox(height: 12),
-                                  ],
-                                  ...widget.problem!.steps.map((s) {
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 8.0,
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          if (s.tex != null &&
-                                              s.tex!.trim().isNotEmpty)
-                                            Align(
-                                              alignment: Alignment.centerLeft,
-                                              child: MixedTextMath(
-                                                s.tex!,
-                                                forceTex: true,
-                                                labelStyle: const TextStyle(
-                                                  fontSize: 20,
-                                                ),
-                                                mathStyle: const TextStyle(
-                                                  fontSize: 22,
-                                                ),
-                                              ),
-                                            ),
-                                          if (s.imageAsset != null)
-                                            FutureBuilder<bool>(
-                                              future: _assetExists(
-                                                s.imageAsset!,
-                                              ),
-                                              builder: (ctx, snap) {
-                                                if (snap.connectionState !=
-                                                    ConnectionState.done) {
-                                                  return const SizedBox.shrink();
-                                                }
-                                                if (snap.hasData &&
-                                                    snap.data == true) {
-                                                  return Column(
-                                                    children: [
-                                                      const SizedBox(height: 6),
-                                                      Center(
-                                                        child: ConstrainedBox(
-                                                          constraints:
-                                                              const BoxConstraints(
-                                                                maxHeight: 400,
-                                                              ),
-                                                          child: Image.asset(
-                                                            s.imageAsset!,
-                                                            fit: BoxFit.contain,
-                                                            errorBuilder:
-                                                                (
-                                                                  context,
-                                                                  error,
-                                                                  stackTrace,
-                                                                ) =>
-                                                                    const SizedBox.shrink(),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  );
-                                                } else {
-                                                  return const SizedBox.shrink();
-                                                }
-                                              },
-                                            ),
-                                        ],
-                                      ),
-                                    );
-                                  }).toList(),
-                                ],
                               ],
                             ),
                           ),
-                        ),
-                      )
-                    : Container(
-                        padding: const EdgeInsets.only(
-                          left: 16,
-                          right: 16,
-                          top: 12,
-                          bottom: 8,
-                        ),
+                  ],
+                  if (_answerDisplayMode == AnswerDisplayMode.none) ...[
+                    Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          border: Border(
-                            bottom: BorderSide(color: Colors.grey[300]!),
-                          ),
+                          color: Colors.white,
+                          border: Border.all(color: Colors.grey[300]!),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(left: 32),
-                                  child: Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: MixedTextMath(
-                                      widget.problem!.question,
-                                      labelStyle: const TextStyle(fontSize: 18),
-                                      mathStyle: const TextStyle(fontSize: 24),
-                                      forceTex: false,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            if (_answerDisplayMode == AnswerDisplayMode.answer || _answerDisplayMode == AnswerDisplayMode.explanation) ...[
-                              const SizedBox(height: 16),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: MixedTextMath(
-                                  "【答え】",
-                                  labelStyle: const TextStyle(fontSize: 19),
-                                  mathStyle: const TextStyle(fontSize: 22),
-                                  forceTex: false,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: MixedTextMath(
-                                  widget.problem!.answer,
-                                  labelStyle: const TextStyle(fontSize: 19),
-                                  mathStyle: const TextStyle(
-                                    fontSize: 28,
-                                    color: Colors.green,
-                                  ),
-                                  forceTex: false,
-                                ),
-                              ),
-                            ],
-                            if (_showHint && widget.problem!.hint != null && widget.problem!.hint!.isNotEmpty) ...[
-                              const SizedBox(height: 16),
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange[50],
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.orange[200]!),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: MixedTextMath(
-                                        "【ヒント】",
-                                        labelStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                                        mathStyle: const TextStyle(fontSize: 20),
-                                        forceTex: false,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: MixedTextMath(
-                                        widget.problem!.hint!,
-                                        forceTex: true,
-                                        labelStyle: const TextStyle(fontSize: 18),
-                                        mathStyle: const TextStyle(fontSize: 20),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
+                        child: RepaintBoundary(
+                          key: _paintKey,
+                          child: _buildScrollableCanvas(),
                         ),
                       ),
-              ],
-              if (_answerDisplayMode == AnswerDisplayMode.none) ...[
-                Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: Colors.grey[300]!),
-                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: RepaintBoundary(
-                      key: _paintKey,
-                      child: _buildScrollableCanvas(),
-                    ),
-                  ),
-                ),
-              ],
+                  ],
+                ],
+              ),
             ],
           ),
-        ],
-      ),
         ),
         // iPadの場合はツールパレット、それ以外は既存のボタン
         if (_answerDisplayMode == AnswerDisplayMode.none) ...[
           if (isIPad(context))
             _buildIPadToolPalette()
           else ...[
-          RepaintBoundary(child: _buildDraggablePenButton()),
-          DraggableEraserButton(
-            isSelected: _isEraser && !_isScrollMode,
-            onTap: () {
-              setState(() {
-                _isEraser = !_isEraser;
-                _isScrollMode = false;
-              });
-              _activeToolNotifier.value = _isEraser ? 'eraser' : 'pen';
-            },
-          ),
-          DraggableScrollButton(
-            isSelected: _isScrollMode,
-            onTap: () {
-              setState(() {
-                _isScrollMode = !_isScrollMode;
-                _isEraser = false;
-              });
-              _activeToolNotifier.value = _isScrollMode ? 'scroll' : 'pen';
-            },
-          ),
+            RepaintBoundary(child: _buildDraggablePenButton()),
+            DraggableEraserButton(
+              isSelected: _isEraser && !_isScrollMode,
+              onTap: () {
+                setState(() {
+                  _isEraser = !_isEraser;
+                  _isScrollMode = false;
+                });
+                _activeToolNotifier.value = _isEraser ? 'eraser' : 'pen';
+              },
+            ),
+            DraggableScrollButton(
+              isSelected: _isScrollMode,
+              onTap: () {
+                setState(() {
+                  _isScrollMode = !_isScrollMode;
+                  _isEraser = false;
+                });
+                _activeToolNotifier.value = _isScrollMode ? 'scroll' : 'pen';
+              },
+            ),
           ],
         ],
         const DraggableTimer(),
@@ -1119,16 +1226,16 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
         ),
       );
     }
-    
+
     final screenSize = MediaQuery.of(context).size;
     final paletteWidth = _isPaletteExpanded ? 600.0 : 56.0;
     final paletteHeight = _isPaletteExpanded ? 120.0 : 56.0; // 2段なので高さを増やす
-    
+
     // 位置が初期化されていない場合はデフォルト位置を設定（左上位置ベース）
     if (_palettePosition == Offset.zero) {
       _palettePosition = Offset(screenSize.width / 2 - paletteWidth / 2, 100);
     }
-    
+
     // Positionedウィジェット用の位置計算（左上位置ベース）
     // _palettePosition.dxはleft、_palettePosition.dyはbottomからの距離
     // 展開状態で画面外にはみ出さないように位置を調整
@@ -1136,8 +1243,11 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     // パディング（左右各12px）は内部に含まれるため、paletteWidthで計算可能
     final maxX = screenSize.width - paletteWidth;
     final clampedX = _palettePosition.dx.clamp(0.0, maxX);
-    final clampedY = _palettePosition.dy.clamp(0.0, screenSize.height - paletteHeight);
-    
+    final clampedY = _palettePosition.dy.clamp(
+      0.0,
+      screenSize.height - paletteHeight,
+    );
+
     // 位置が調整された場合は_palettePositionも更新
     if (_palettePosition.dx != clampedX || _palettePosition.dy != clampedY) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1148,7 +1258,7 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
         }
       });
     }
-    
+
     return Positioned(
       left: clampedX,
       bottom: clampedY,
@@ -1162,16 +1272,16 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
           setState(() {
             final paletteWidth = _isPaletteExpanded ? 600.0 : 56.0;
             final paletteHeight = _isPaletteExpanded ? 120.0 : 56.0;
-            
+
             // タイマーと同様に左上位置を直接更新
             final newX = _palettePosition.dx + details.delta.dx;
             // bottom座標なので、Y方向は逆（上に動かすとbottomが減る）
             final newY = _palettePosition.dy - details.delta.dy;
-            
+
             // 展開時は右端まで移動できるように、クランプの最大値を調整
             // パレットの右端が画面の右端に到達できるようにする
             final maxX = screenSize.width - paletteWidth;
-            
+
             _palettePosition = Offset(
               newX.clamp(0.0, maxX),
               newY.clamp(0.0, screenSize.height - paletteHeight),
@@ -1214,33 +1324,29 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                        // 上段: ツール類
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            // 左側: Undo/Redoボタン
-                            _buildUndoRedoButtons(),
-                            const SizedBox(width: 12),
-                            // 中央: 描画ツール
-                            _buildDrawingTools(),
-                            const SizedBox(width: 12),
-                            // 右端: 追加オプション
-                            _buildAdditionalOptions(),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        // 下段: カラーパレット
-                        _buildColorPalette(),
-                      ],
+                          // 上段: ツール類
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // 左側: Undo/Redoボタン
+                              _buildUndoRedoButtons(),
+                              const SizedBox(width: 12),
+                              // 中央: 描画ツール
+                              _buildDrawingTools(),
+                              const SizedBox(width: 12),
+                              // 右端: 追加オプション
+                              _buildAdditionalOptions(),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          // 下段: カラーパレット
+                          _buildColorPalette(),
+                        ],
                       ),
                     ),
                     // 右上に最小化ボタン
-                    Positioned(
-                      top: 4,
-                      right: 4,
-                      child: _buildMinimizeButton(),
-                    ),
+                    Positioned(top: 4, right: 4, child: _buildMinimizeButton()),
                   ],
                 )
               : GestureDetector(
@@ -1249,7 +1355,7 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
                       final screenSize = MediaQuery.of(context).size;
                       final oldWidth = 56.0;
                       final newWidth = 600.0;
-                      
+
                       // 展開時に右端にはみ出さないように位置を調整
                       final currentLeft = _palettePosition.dx;
                       final maxLeft = screenSize.width - newWidth;
@@ -1257,7 +1363,7 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
                         currentLeft.clamp(0.0, maxLeft),
                         _palettePosition.dy,
                       );
-                      
+
                       _isPaletteExpanded = true;
                     });
                     _savePalettePosition();
@@ -1338,7 +1444,7 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
       Colors.grey,
       Colors.brown,
     ];
-    
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -1347,10 +1453,12 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
         _buildColorSwatch(_currentColor, isSelected: true),
         const SizedBox(width: 8),
         // プリセットカラー
-        ...presetColors.map((color) => Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: _buildColorSwatch(color),
-        )),
+        ...presetColors.map(
+          (color) => Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: _buildColorSwatch(color),
+          ),
+        ),
       ],
     );
   }
@@ -1382,10 +1490,11 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
   // 選択されたストロークを削除
   void _deleteSelectedStrokes() {
     if (_selectedStrokeIndices.isEmpty) return;
-    
+
     setState(() {
       // インデックスを降順にソートして削除（インデックスがずれないように）
-      final sortedIndices = _selectedStrokeIndices.toList()..sort((a, b) => b.compareTo(a));
+      final sortedIndices = _selectedStrokeIndices.toList()
+        ..sort((a, b) => b.compareTo(a));
       for (final index in sortedIndices) {
         if (index < _strokes.length) {
           _strokes.removeAt(index);
@@ -1451,11 +1560,7 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
           color: Colors.grey[200],
           border: Border.all(color: Colors.grey[400]!, width: 1),
         ),
-        child: Icon(
-          Icons.close,
-          color: Colors.grey[800],
-          size: 20,
-        ),
+        child: Icon(Icons.close, color: Colors.grey[800], size: 20),
       ),
     );
   }
@@ -1494,16 +1599,18 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
           if (_currentTool == DrawingTool.lasso && tool != DrawingTool.lasso) {
             _clearSelection();
           }
-          
+
           // ラッソ選択ツールに切り替える場合は前のツールを保存
           if (tool == DrawingTool.lasso && _currentTool != DrawingTool.lasso) {
             _previousTool = _currentTool;
           }
-          
+
           _currentTool = tool;
-          _isEraser = tool == DrawingTool.strokeEraser || tool == DrawingTool.partialEraser;
+          _isEraser =
+              tool == DrawingTool.strokeEraser ||
+              tool == DrawingTool.partialEraser;
           _isScrollMode = false;
-          
+
           // ツールに応じた設定
           switch (tool) {
             case DrawingTool.text:
@@ -1650,36 +1757,41 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
           child: Wrap(
             spacing: 10,
             runSpacing: 10,
-            children: [
-              Colors.black,
-              Colors.white,
-              Colors.red,
-              Colors.orange,
-              Colors.yellow,
-              Colors.green,
-              Colors.blue,
-              Colors.indigo,
-              Colors.purple,
-              Colors.pink,
-              Colors.brown,
-              Colors.grey,
-            ].map((color) => GestureDetector(
-              onTap: () {
-                setState(() {
-                  _currentColor = color;
-                });
-                Navigator.pop(context);
-              },
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.grey),
-                ),
-              ),
-            )).toList(),
+            children:
+                [
+                      Colors.black,
+                      Colors.white,
+                      Colors.red,
+                      Colors.orange,
+                      Colors.yellow,
+                      Colors.green,
+                      Colors.blue,
+                      Colors.indigo,
+                      Colors.purple,
+                      Colors.pink,
+                      Colors.brown,
+                      Colors.grey,
+                    ]
+                    .map(
+                      (color) => GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _currentColor = color;
+                          });
+                          Navigator.pop(context);
+                        },
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.grey),
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
           ),
         ),
       ),
@@ -1739,22 +1851,22 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     if (_isScrollMode) {
       return true;
     }
-    
+
     // Apple Pencilが使用されている場合はスクロールを無効化
     if (_activePointerKind == PointerDeviceKind.stylus) {
       return false;
     }
-    
+
     // 指のタッチが使用されている場合はスクロールを有効化
     if (_activePointerKind == PointerDeviceKind.touch) {
       return true;
     }
-    
+
     // ポインターが離れている場合は、iPadの場合はスクロールを有効化（既存の動作を維持）
     if (_activePointerKind == null && isIPadDevice) {
       return true;
     }
-    
+
     return false;
   }
 
@@ -1762,7 +1874,7 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     // スクロールの有効/無効を制御
     final isIPadDevice = isIPad(context);
     final shouldEnableScroll = _calculateShouldEnableScroll(isIPadDevice);
-    
+
     return SingleChildScrollView(
       key: _scrollViewKey,
       controller: _verticalScrollController,
@@ -1790,16 +1902,16 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
               onPointerUp: _onPointerUp,
               onPointerCancel: _onPointerCancel,
               child: CustomPaint(
-              painter: DrawingPainter(
-                strokes: _strokes,
-                currentStroke: _points,
-                showRuler: false,
-                rulerStart: Offset.zero,
-                rulerEnd: Offset.zero,
-                lassoPath: _isLassoSelecting ? _lassoPath : null,
-                selectedStrokeIndices: _selectedStrokeIndices,
-                selectionBounds: _selectionBounds,
-              ),
+                painter: DrawingPainter(
+                  strokes: _strokes,
+                  currentStroke: _points,
+                  showRuler: false,
+                  rulerStart: Offset.zero,
+                  rulerEnd: Offset.zero,
+                  lassoPath: _isLassoSelecting ? _lassoPath : null,
+                  selectedStrokeIndices: _selectedStrokeIndices,
+                  selectionBounds: _selectionBounds,
+                ),
                 size: const Size(2000, 2000),
               ),
             ),
@@ -1821,7 +1933,9 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     }
 
     // 指で描画が無効で、かつ指のタッチの場合は無視
-    if (isIPad(context) && !_allowFingerDrawing && event.kind == PointerDeviceKind.touch) {
+    if (isIPad(context) &&
+        !_allowFingerDrawing &&
+        event.kind == PointerDeviceKind.touch) {
       return;
     }
 
@@ -1830,7 +1944,7 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
       // バウンディングボックスを更新
       _selectionBounds = _calculateSelectionBounds();
       _selectionCenter = _calculateSelectionCenter();
-      
+
       // ハンドルがタップされたかを確認（移動処理より優先）
       if (_selectionBounds != null) {
         final handleIndex = _getHandleAtPosition(event.localPosition);
@@ -1841,10 +1955,12 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
           for (final index in _selectedStrokeIndices) {
             if (index < _strokes.length && _strokes[index].isNotEmpty) {
               // 各ポイントの位置をコピーして保存
-              _originalStrokePositions[index] = _strokes[index].map((p) => Offset(p.point.dx, p.point.dy)).toList();
+              _originalStrokePositions[index] = _strokes[index]
+                  .map((p) => Offset(p.point.dx, p.point.dy))
+                  .toList();
             }
           }
-          
+
           setState(() {
             _selectedHandleIndex = handleIndex;
             _handleDragStart = event.localPosition;
@@ -1858,7 +1974,7 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
           return;
         }
       }
-      
+
       // 選択オブジェクトの移動開始（ハンドルがタップされていない場合のみ）
       _selectionOffset = event.localPosition;
       return;
@@ -1875,7 +1991,8 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     }
 
     // 部分消しゴム（またはストローク消しゴム）の場合、前回位置を記録
-    if (_currentTool == DrawingTool.partialEraser || _currentTool == DrawingTool.strokeEraser) {
+    if (_currentTool == DrawingTool.partialEraser ||
+        _currentTool == DrawingTool.strokeEraser) {
       setState(() {
         _lastEraserPosition = event.localPosition;
       });
@@ -1884,16 +2001,17 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     // スクロールモードでない場合のみ描画を開始
     final pressure = event.pressure;
     final strokeWidth = _calculateStrokeWidth(pressure);
-    
+
     _isDrawingNotifier.value = true;
-    
+
     setState(() {
       _points = [
         DrawingPoint(
           event.localPosition,
           _currentColor,
           strokeWidth,
-          _currentTool == DrawingTool.strokeEraser || _currentTool == DrawingTool.partialEraser,
+          _currentTool == DrawingTool.strokeEraser ||
+              _currentTool == DrawingTool.partialEraser,
         ),
       ];
     });
@@ -1906,7 +2024,9 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     }
 
     // 指で描画が無効で、かつ指のタッチの場合は無視
-    if (isIPad(context) && !_allowFingerDrawing && event.kind == PointerDeviceKind.touch) {
+    if (isIPad(context) &&
+        !_allowFingerDrawing &&
+        event.kind == PointerDeviceKind.touch) {
       return;
     }
 
@@ -1919,50 +2039,58 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     }
 
     // ハンドルをドラッグして拡大縮小
-    if (_selectedStrokeIndices.isNotEmpty && _selectedHandleIndex != null && _handleDragStart != null && _originalSelectionBounds != null && _originalSelectionCenter != null) {
+    if (_selectedStrokeIndices.isNotEmpty &&
+        _selectedHandleIndex != null &&
+        _handleDragStart != null &&
+        _originalSelectionBounds != null &&
+        _originalSelectionCenter != null) {
       // 元の位置が存在しない場合は再計算（確実に保存されていることを確認）
       bool needsUpdate = false;
       for (final index in _selectedStrokeIndices) {
-        if (index < _strokes.length && !_originalStrokePositions.containsKey(index)) {
+        if (index < _strokes.length &&
+            !_originalStrokePositions.containsKey(index)) {
           needsUpdate = true;
           break;
         }
       }
-      
+
       if (needsUpdate || _originalStrokePositions.isEmpty) {
         for (final index in _selectedStrokeIndices) {
           if (index < _strokes.length) {
-            _originalStrokePositions[index] = _strokes[index].map((p) => p.point).toList();
+            _originalStrokePositions[index] = _strokes[index]
+                .map((p) => p.point)
+                .toList();
           }
         }
       }
-      
+
       final originalBounds = _originalSelectionBounds!;
       final originalCenter = _originalSelectionCenter!;
       final startPos = _handleDragStart!;
       final currentPos = event.localPosition;
-      
+
       // 元のバウンディングボックスのハンドル位置を取得
       final originalHandles = [
-        Offset(originalBounds.left, originalBounds.top),      // 左上
-        Offset(originalBounds.right, originalBounds.top),     // 右上
-        Offset(originalBounds.left, originalBounds.bottom),   // 左下
-        Offset(originalBounds.right, originalBounds.bottom),  // 右下
+        Offset(originalBounds.left, originalBounds.top), // 左上
+        Offset(originalBounds.right, originalBounds.top), // 右上
+        Offset(originalBounds.left, originalBounds.bottom), // 左下
+        Offset(originalBounds.right, originalBounds.bottom), // 右下
       ];
-      
+
       // ドラッグ開始時のハンドル位置（元の位置）
       final handleStartPos = originalHandles[_selectedHandleIndex!];
       // 現在のハンドル位置（ドラッグの移動量を加算）
       final handleCurrentPos = handleStartPos + (currentPos - startPos);
-      
+
       // 元の中心からの距離でスケールを計算
       final startDistance = (handleStartPos - originalCenter).distance;
       final currentDistance = (handleCurrentPos - originalCenter).distance;
-      
+
       // 距離が0より大きい場合のみスケールを計算
-      if (startDistance > 0.01) { // より小さな閾値でゼロ除算を防ぐ
+      if (startDistance > 0.01) {
+        // より小さな閾値でゼロ除算を防ぐ
         final scale = (currentDistance / startDistance).clamp(0.5, 3.0);
-        
+
         // スケールが実際に変化している場合のみ更新
         if ((scale - _selectionScale).abs() > 0.001 || _selectionScale == 1.0) {
           setState(() {
@@ -1989,7 +2117,9 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
               point.point += delta;
             }
             // 移動後に元の位置を更新
-            _originalStrokePositions[index] = _strokes[index].map((p) => p.point).toList();
+            _originalStrokePositions[index] = _strokes[index]
+                .map((p) => p.point)
+                .toList();
           }
         }
         _selectionOffset = event.localPosition;
@@ -2002,7 +2132,8 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     final pressure = event.pressure;
     final strokeWidth = _calculateStrokeWidth(pressure);
 
-    if (_currentTool == DrawingTool.strokeEraser || _currentTool == DrawingTool.partialEraser) {
+    if (_currentTool == DrawingTool.strokeEraser ||
+        _currentTool == DrawingTool.partialEraser) {
       // ストローク消しゴムも部分消しゴムと同じ挙動にする（ユーザー要望により）
       // 前回位置から現在位置までの軌跡で消去
       if (_lastEraserPosition != null) {
@@ -2016,12 +2147,7 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     } else {
       setState(() {
         _points.add(
-          DrawingPoint(
-            event.localPosition,
-            _currentColor,
-            strokeWidth,
-            false,
-          ),
+          DrawingPoint(event.localPosition, _currentColor, strokeWidth, false),
         );
       });
     }
@@ -2034,7 +2160,8 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     setState(() {
       _activePointerKind = null;
       // 部分消しゴムの位置もクリア
-      if (_currentTool == DrawingTool.partialEraser || _currentTool == DrawingTool.strokeEraser) {
+      if (_currentTool == DrawingTool.partialEraser ||
+          _currentTool == DrawingTool.strokeEraser) {
         _lastEraserPosition = null;
       }
     });
@@ -2045,7 +2172,9 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     }
 
     // 指で描画が無効で、かつ指のタッチの場合は無視
-    if (isIPad(context) && !_allowFingerDrawing && event.kind == PointerDeviceKind.touch) {
+    if (isIPad(context) &&
+        !_allowFingerDrawing &&
+        event.kind == PointerDeviceKind.touch) {
       return;
     }
 
@@ -2068,7 +2197,9 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
         // 拡大縮小終了時に元の位置を更新
         for (final index in _selectedStrokeIndices) {
           if (index < _strokes.length) {
-            _originalStrokePositions[index] = _strokes[index].map((p) => p.point).toList();
+            _originalStrokePositions[index] = _strokes[index]
+                .map((p) => p.point)
+                .toList();
           }
         }
         _selectedHandleIndex = null;
@@ -2090,7 +2221,9 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
         // 移動終了時に元の位置を更新
         for (final index in _selectedStrokeIndices) {
           if (index < _strokes.length) {
-            _originalStrokePositions[index] = _strokes[index].map((p) => p.point).toList();
+            _originalStrokePositions[index] = _strokes[index]
+                .map((p) => p.point)
+                .toList();
           }
         }
         _selectionOffset = null;
@@ -2100,7 +2233,8 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
       return;
     }
 
-    if (_currentTool != DrawingTool.strokeEraser && _currentTool != DrawingTool.partialEraser) {
+    if (_currentTool != DrawingTool.strokeEraser &&
+        _currentTool != DrawingTool.partialEraser) {
       setState(() {
         _strokes.add(List.from(_points));
         _points = [];
@@ -2116,7 +2250,8 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     setState(() {
       _activePointerKind = null;
       // 部分消しゴムの位置もクリア
-      if (_currentTool == DrawingTool.partialEraser || _currentTool == DrawingTool.strokeEraser) {
+      if (_currentTool == DrawingTool.partialEraser ||
+          _currentTool == DrawingTool.strokeEraser) {
         _lastEraserPosition = null;
       }
     });
@@ -2149,11 +2284,13 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
       if (_originalStrokePositions.isEmpty) {
         for (final index in _selectedStrokeIndices) {
           if (index < _strokes.length) {
-            _originalStrokePositions[index] = _strokes[index].map((p) => p.point).toList();
+            _originalStrokePositions[index] = _strokes[index]
+                .map((p) => p.point)
+                .toList();
           }
         }
       }
-      
+
       final newScale = (_initialScale * details.scale).clamp(0.5, 3.0);
       setState(() {
         _selectionScale = newScale;
@@ -2170,7 +2307,9 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
         // 拡大縮小終了時に元の位置を更新
         for (final index in _selectedStrokeIndices) {
           if (index < _strokes.length) {
-            _originalStrokePositions[index] = _strokes[index].map((p) => p.point).toList();
+            _originalStrokePositions[index] = _strokes[index]
+                .map((p) => p.point)
+                .toList();
           }
         }
         _selectionScale = 1.0; // スケールをリセット
@@ -2181,11 +2320,11 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
   // 選択されたストロークの中心点を計算
   Offset _calculateSelectionCenter() {
     if (_selectedStrokeIndices.isEmpty) return Offset.zero;
-    
+
     double totalX = 0;
     double totalY = 0;
     int pointCount = 0;
-    
+
     for (final index in _selectedStrokeIndices) {
       if (index < _strokes.length) {
         for (final point in _strokes[index]) {
@@ -2195,7 +2334,7 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
         }
       }
     }
-    
+
     if (pointCount == 0) return Offset.zero;
     return Offset(totalX / pointCount, totalY / pointCount);
   }
@@ -2203,9 +2342,9 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
   // 選択されたオブジェクト全体のバウンディングボックスを計算
   Rect? _calculateSelectionBounds() {
     if (_selectedStrokeIndices.isEmpty) return null;
-    
+
     double? minX, minY, maxX, maxY;
-    
+
     for (final index in _selectedStrokeIndices) {
       if (index < _strokes.length) {
         for (final point in _strokes[index]) {
@@ -2218,9 +2357,10 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
         }
       }
     }
-    
-    if (minX == null || minY == null || maxX == null || maxY == null) return null;
-    
+
+    if (minX == null || minY == null || maxX == null || maxY == null)
+      return null;
+
     const padding = 8.0;
     return Rect.fromLTRB(
       minX - padding,
@@ -2233,24 +2373,24 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
   // ハンドルがタップされたかを検出（0: 左上、1: 右上、2: 左下、3: 右下）
   int? _getHandleAtPosition(Offset position) {
     if (_selectionBounds == null) return null;
-    
+
     // ハンドルの検出範囲を広げる（タッチしやすくするため）
     const handleTouchRadius = 20.0; // タッチ検出範囲を20pxに拡大
-    
+
     final bounds = _selectionBounds!;
     final handles = [
-      Offset(bounds.left, bounds.top),      // 左上
-      Offset(bounds.right, bounds.top),     // 右上
-      Offset(bounds.left, bounds.bottom),   // 左下
-      Offset(bounds.right, bounds.bottom),  // 右下
+      Offset(bounds.left, bounds.top), // 左上
+      Offset(bounds.right, bounds.top), // 右上
+      Offset(bounds.left, bounds.bottom), // 左下
+      Offset(bounds.right, bounds.bottom), // 右下
     ];
-    
+
     for (int i = 0; i < handles.length; i++) {
       if ((position - handles[i]).distance <= handleTouchRadius) {
         return i;
       }
     }
-    
+
     return null;
   }
 
@@ -2269,21 +2409,22 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
   // 元の位置からスケールを適用（拡大縮小用）
   void _scaleSelectedStrokesFromOriginal(double scale, Offset center) {
     for (final index in _selectedStrokeIndices) {
-      if (index < _strokes.length && _originalStrokePositions.containsKey(index)) {
+      if (index < _strokes.length &&
+          _originalStrokePositions.containsKey(index)) {
         final originalPositions = _originalStrokePositions[index]!;
         final stroke = _strokes[index];
-        
+
         // ストロークと元の位置の長さが一致しない場合の処理
-        final minLength = stroke.length < originalPositions.length 
-            ? stroke.length 
+        final minLength = stroke.length < originalPositions.length
+            ? stroke.length
             : originalPositions.length;
-        
+
         for (int i = 0; i < minLength; i++) {
           final originalPoint = originalPositions[i];
           final offset = originalPoint - center;
           stroke[i].point = center + offset * scale;
         }
-        
+
         // ストロークが元の位置より長い場合、残りのポイントもスケール
         if (stroke.length > originalPositions.length) {
           // 最後の元の位置からのオフセットを使用
@@ -2304,14 +2445,14 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     setState(() {
       const eraseRadius = 20.0;
       final List<List<DrawingPoint>> newStrokes = [];
-      
+
       for (final stroke in _strokes) {
         final List<DrawingPoint> remainingPoints = [];
         bool wasErasing = false;
-        
+
         for (int i = 0; i < stroke.length; i++) {
           final distance = (stroke[i].point - point).distance;
-          
+
           if (distance < eraseRadius) {
             // 消しゴムの範囲内のポイントはスキップ
             wasErasing = true;
@@ -2328,13 +2469,13 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
             wasErasing = false;
           }
         }
-        
+
         // 残りのポイントがある場合は追加
         if (remainingPoints.length > 1) {
           newStrokes.add(remainingPoints);
         }
       }
-      
+
       _strokes = newStrokes;
     });
   }
@@ -2344,12 +2485,12 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     setState(() {
       const eraseRadius = 20.0;
       final List<List<DrawingPoint>> newStrokes = [];
-      
+
       for (final stroke in _strokes) {
         if (stroke.isEmpty) {
           continue;
         }
-        
+
         if (stroke.length == 1) {
           // 1点のストロークの場合、消しゴムの軌跡から十分離れている場合のみ保持
           final point = stroke[0].point;
@@ -2359,25 +2500,26 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
           }
           continue;
         }
-        
+
         final List<DrawingPoint> currentSegment = [];
         bool wasErasing = false;
-        
+
         for (int i = 0; i < stroke.length; i++) {
           final point = stroke[i].point;
-          
+
           // 消しゴムの軌跡（線分）からポイントへの距離を計算
           final distToLine = _pointToLineDistance(point, startPoint, endPoint);
-          
+
           // 消しゴムの軌跡の開始点と終了点からの距離もチェック（軌跡の範囲外の場合は無視）
           final distToStart = (point - startPoint).distance;
           final distToEnd = (point - endPoint).distance;
-          
+
           // 消しゴムの軌跡上の点かどうかを判定（軌跡の線分上にあるか、または軌跡の端点に近いか）
-          final isOnTrajectory = distToLine < eraseRadius && 
+          final isOnTrajectory =
+              distToLine < eraseRadius &&
               (distToStart <= (endPoint - startPoint).distance + eraseRadius) &&
               (distToEnd <= (endPoint - startPoint).distance + eraseRadius);
-          
+
           if (isOnTrajectory) {
             // 消しゴムの範囲内
             if (wasErasing) {
@@ -2403,7 +2545,7 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
             }
           }
         }
-        
+
         // 最後のセグメントを保存
         if (currentSegment.length > 1) {
           newStrokes.add(currentSegment);
@@ -2412,22 +2554,24 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
           newStrokes.add(currentSegment);
         }
       }
-      
+
       _strokes = newStrokes;
     });
   }
 
   // 2つの線分間の最短距離を計算する
   double _lineSegmentToLineSegmentDistance(
-    Offset line1Start, Offset line1End,
-    Offset line2Start, Offset line2End,
+    Offset line1Start,
+    Offset line1End,
+    Offset line2Start,
+    Offset line2End,
   ) {
     // 各線分の端点からもう一方の線分への距離を計算
     final dist1 = _pointToLineDistance(line1Start, line2Start, line2End);
     final dist2 = _pointToLineDistance(line1End, line2Start, line2End);
     final dist3 = _pointToLineDistance(line2Start, line1Start, line1End);
     final dist4 = _pointToLineDistance(line2End, line1Start, line1End);
-    
+
     // 最小距離を返す
     return [dist1, dist2, dist3, dist4].reduce((a, b) => a < b ? a : b);
   }
@@ -2437,16 +2581,17 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     final lineVec = lineEnd - lineStart;
     final pointVec = point - lineStart;
     final lineLengthSq = lineVec.distanceSquared;
-    
+
     if (lineLengthSq < 0.0001) {
       // 線分が点の場合
       return pointVec.distance;
     }
-    
-    final t = (pointVec.dx * lineVec.dx + pointVec.dy * lineVec.dy) / lineLengthSq;
+
+    final t =
+        (pointVec.dx * lineVec.dx + pointVec.dy * lineVec.dy) / lineLengthSq;
     final tClamped = t.clamp(0.0, 1.0);
     final closestPoint = lineStart + lineVec * tClamped;
-    
+
     return (point - closestPoint).distance;
   }
 
@@ -2462,7 +2607,7 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
         (lineEnd - circleCenter).distance < radius) {
       return true;
     }
-    
+
     // 点から線分への最短距離が半径以下かチェック
     final distance = _pointToLineDistance(circleCenter, lineStart, lineEnd);
     return distance < radius;
@@ -2473,9 +2618,7 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
     setState(() {
       const eraseRadius = 20.0;
       _strokes.removeWhere((stroke) {
-        return stroke.any(
-          (p) => (p.point - point).distance < eraseRadius,
-        );
+        return stroke.any((p) => (p.point - point).distance < eraseRadius);
       });
     });
   }
@@ -2483,11 +2626,11 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
   // ラッソパス内のストロークを選択
   void _selectStrokesInLasso() {
     if (_lassoPath.length < 3) return;
-    
+
     // ラッソパスを閉じたパスとして扱う
     final lassoPolygon = _lassoPath;
     final selectedIndices = <int>{};
-    
+
     for (int i = 0; i < _strokes.length; i++) {
       final stroke = _strokes[i];
       // ストロークの各ポイントがラッソパス内にあるかチェック
@@ -2502,7 +2645,7 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
         selectedIndices.add(i);
       }
     }
-    
+
     setState(() {
       _selectedStrokeIndices = selectedIndices;
       _selectionScale = 1.0; // 選択時にスケールをリセット
@@ -2510,7 +2653,9 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
       _originalStrokePositions.clear();
       for (final index in selectedIndices) {
         if (index < _strokes.length) {
-          _originalStrokePositions[index] = _strokes[index].map((p) => p.point).toList();
+          _originalStrokePositions[index] = _strokes[index]
+              .map((p) => p.point)
+              .toList();
         }
       }
       // バウンディングボックスを更新
@@ -2522,23 +2667,24 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
   // ポイントがポリゴン内にあるかチェック（Ray Casting Algorithm）
   bool _isPointInPolygon(Offset point, List<Offset> polygon) {
     if (polygon.length < 3) return false;
-    
+
     bool inside = false;
     int j = polygon.length - 1;
-    
+
     for (int i = 0; i < polygon.length; i++) {
       final xi = polygon[i].dx;
       final yi = polygon[i].dy;
       final xj = polygon[j].dx;
       final yj = polygon[j].dy;
-      
-      final intersect = ((yi > point.dy) != (yj > point.dy)) &&
+
+      final intersect =
+          ((yi > point.dy) != (yj > point.dy)) &&
           (point.dx < (xj - xi) * (point.dy - yi) / (yj - yi) + xi);
-      
+
       if (intersect) inside = !inside;
       j = i;
     }
-    
+
     return inside;
   }
 
@@ -2641,52 +2787,9 @@ class _ScratchPaperPageState extends State<ScratchPaperPage> with WidgetsBinding
           break;
       }
 
-      final history = await SimpleDataManager.getLearningHistory(
+      final success = await SimpleDataManager.saveLearningRecord(
         widget.problem!,
-      );
-      final current = <Map<String, dynamic>>[];
-
-      for (var i = 0; i < _slotCount; i++) {
-        if (i < history.length) {
-          final h = history[i];
-          final status = ProblemStatus.values.firstWhere(
-            (s) => s.name == h['status'],
-            orElse: () => ProblemStatus.none,
-          );
-          final timeStr = h['time'] as String?;
-          current.add({'status': status, 'time': timeStr});
-        } else {
-          current.add({'status': ProblemStatus.none, 'time': null});
-        }
-      }
-
-      while (current.length < _slotCount) {
-        current.add({'status': ProblemStatus.none, 'time': null});
-      }
-
-      int targetSlot = -1;
-      for (var i = 0; i < _slotCount; i++) {
-        final slotStatus = current[i]['status'] as ProblemStatus? ?? ProblemStatus.none;
-        if (slotStatus == ProblemStatus.none) {
-          targetSlot = i;
-          break;
-        }
-      }
-
-      if (targetSlot == -1) {
-        targetSlot = 0;
-      }
-
-      final t = DateTime.now().toIso8601String();
-      current[targetSlot] = {'status': problemStatus, 'time': t};
-
-      for (var j = targetSlot + 1; j < current.length; j++) {
-        current[j] = {'status': ProblemStatus.none, 'time': null};
-      }
-
-      final success = await SimpleDataManager.saveLearningHistory(
-        widget.problem!,
-        current,
+        problemStatus,
       );
 
       if (success) {
@@ -2730,7 +2833,12 @@ class ToolIconPainter extends CustomPainter {
         paint.color = Colors.grey[800]!;
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromLTWH(size.width * 0.2, size.height * 0.1, size.width * 0.6, size.height * 0.7),
+            Rect.fromLTWH(
+              size.width * 0.2,
+              size.height * 0.1,
+              size.width * 0.6,
+              size.height * 0.7,
+            ),
             const Radius.circular(2),
           ),
           paint,
@@ -2748,7 +2856,10 @@ class ToolIconPainter extends CustomPainter {
           textDirection: TextDirection.ltr,
         );
         textPainter.layout();
-        textPainter.paint(canvas, Offset(size.width * 0.35, size.height * 0.25));
+        textPainter.paint(
+          canvas,
+          Offset(size.width * 0.35, size.height * 0.25),
+        );
         break;
 
       case DrawingTool.pen:
@@ -2756,7 +2867,12 @@ class ToolIconPainter extends CustomPainter {
         paint.color = Colors.white;
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromLTWH(size.width * 0.2, size.height * 0.1, size.width * 0.6, size.height * 0.7),
+            Rect.fromLTWH(
+              size.width * 0.2,
+              size.height * 0.1,
+              size.width * 0.6,
+              size.height * 0.7,
+            ),
             const Radius.circular(2),
           ),
           paint,
@@ -2764,7 +2880,12 @@ class ToolIconPainter extends CustomPainter {
         strokePaint.color = Colors.grey[800]!;
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromLTWH(size.width * 0.2, size.height * 0.1, size.width * 0.6, size.height * 0.7),
+            Rect.fromLTWH(
+              size.width * 0.2,
+              size.height * 0.1,
+              size.width * 0.6,
+              size.height * 0.7,
+            ),
             const Radius.circular(2),
           ),
           strokePaint,
@@ -2777,7 +2898,11 @@ class ToolIconPainter extends CustomPainter {
           paint..strokeWidth = 3,
         );
         // 太い先端
-        canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.85), 3, paint);
+        canvas.drawCircle(
+          Offset(size.width * 0.5, size.height * 0.85),
+          3,
+          paint,
+        );
         break;
 
       case DrawingTool.marker:
@@ -2785,7 +2910,12 @@ class ToolIconPainter extends CustomPainter {
         paint.color = Colors.white;
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromLTWH(size.width * 0.2, size.height * 0.1, size.width * 0.6, size.height * 0.7),
+            Rect.fromLTWH(
+              size.width * 0.2,
+              size.height * 0.1,
+              size.width * 0.6,
+              size.height * 0.7,
+            ),
             const Radius.circular(2),
           ),
           paint,
@@ -2793,7 +2923,12 @@ class ToolIconPainter extends CustomPainter {
         strokePaint.color = Colors.grey[800]!;
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromLTWH(size.width * 0.2, size.height * 0.1, size.width * 0.6, size.height * 0.7),
+            Rect.fromLTWH(
+              size.width * 0.2,
+              size.height * 0.1,
+              size.width * 0.6,
+              size.height * 0.7,
+            ),
             const Radius.circular(2),
           ),
           strokePaint,
@@ -2802,7 +2937,12 @@ class ToolIconPainter extends CustomPainter {
         paint.color = Colors.blue.withOpacity(0.3);
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromLTWH(size.width * 0.25, size.height * 0.3, size.width * 0.5, size.height * 0.3),
+            Rect.fromLTWH(
+              size.width * 0.25,
+              size.height * 0.3,
+              size.width * 0.5,
+              size.height * 0.3,
+            ),
             const Radius.circular(1),
           ),
           paint,
@@ -2823,7 +2963,12 @@ class ToolIconPainter extends CustomPainter {
         paint.color = Colors.white;
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromLTWH(size.width * 0.2, size.height * 0.1, size.width * 0.6, size.height * 0.7),
+            Rect.fromLTWH(
+              size.width * 0.2,
+              size.height * 0.1,
+              size.width * 0.6,
+              size.height * 0.7,
+            ),
             const Radius.circular(2),
           ),
           paint,
@@ -2831,14 +2976,23 @@ class ToolIconPainter extends CustomPainter {
         strokePaint.color = Colors.grey[800]!;
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromLTWH(size.width * 0.2, size.height * 0.1, size.width * 0.6, size.height * 0.7),
+            Rect.fromLTWH(
+              size.width * 0.2,
+              size.height * 0.1,
+              size.width * 0.6,
+              size.height * 0.7,
+            ),
             const Radius.circular(2),
           ),
           strokePaint,
         );
         // ピンクの先端
         paint.color = Colors.pink[300]!;
-        canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.85), 4, paint);
+        canvas.drawCircle(
+          Offset(size.width * 0.5, size.height * 0.85),
+          4,
+          paint,
+        );
         break;
 
       case DrawingTool.partialEraser:
@@ -2846,7 +3000,12 @@ class ToolIconPainter extends CustomPainter {
         paint.color = Colors.white;
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromLTWH(size.width * 0.2, size.height * 0.1, size.width * 0.6, size.height * 0.7),
+            Rect.fromLTWH(
+              size.width * 0.2,
+              size.height * 0.1,
+              size.width * 0.6,
+              size.height * 0.7,
+            ),
             const Radius.circular(2),
           ),
           paint,
@@ -2854,7 +3013,12 @@ class ToolIconPainter extends CustomPainter {
         strokePaint.color = Colors.grey[800]!;
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromLTWH(size.width * 0.2, size.height * 0.1, size.width * 0.6, size.height * 0.7),
+            Rect.fromLTWH(
+              size.width * 0.2,
+              size.height * 0.1,
+              size.width * 0.6,
+              size.height * 0.7,
+            ),
             const Radius.circular(2),
           ),
           strokePaint,
@@ -2877,7 +3041,12 @@ class ToolIconPainter extends CustomPainter {
         paint.color = Colors.white;
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromLTWH(size.width * 0.2, size.height * 0.1, size.width * 0.6, size.height * 0.7),
+            Rect.fromLTWH(
+              size.width * 0.2,
+              size.height * 0.1,
+              size.width * 0.6,
+              size.height * 0.7,
+            ),
             const Radius.circular(2),
           ),
           paint,
@@ -2885,7 +3054,12 @@ class ToolIconPainter extends CustomPainter {
         strokePaint.color = Colors.grey[800]!;
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromLTWH(size.width * 0.2, size.height * 0.1, size.width * 0.6, size.height * 0.7),
+            Rect.fromLTWH(
+              size.width * 0.2,
+              size.height * 0.1,
+              size.width * 0.6,
+              size.height * 0.7,
+            ),
             const Radius.circular(2),
           ),
           strokePaint,
@@ -2895,10 +3069,30 @@ class ToolIconPainter extends CustomPainter {
         strokePaint.strokeWidth = 2;
         final lassoPath = Path();
         lassoPath.moveTo(size.width * 0.3, size.height * 0.3);
-        lassoPath.quadraticBezierTo(size.width * 0.5, size.height * 0.2, size.width * 0.7, size.height * 0.3);
-        lassoPath.quadraticBezierTo(size.width * 0.8, size.height * 0.5, size.width * 0.7, size.height * 0.7);
-        lassoPath.quadraticBezierTo(size.width * 0.5, size.height * 0.8, size.width * 0.3, size.height * 0.7);
-        lassoPath.quadraticBezierTo(size.width * 0.2, size.height * 0.5, size.width * 0.3, size.height * 0.3);
+        lassoPath.quadraticBezierTo(
+          size.width * 0.5,
+          size.height * 0.2,
+          size.width * 0.7,
+          size.height * 0.3,
+        );
+        lassoPath.quadraticBezierTo(
+          size.width * 0.8,
+          size.height * 0.5,
+          size.width * 0.7,
+          size.height * 0.7,
+        );
+        lassoPath.quadraticBezierTo(
+          size.width * 0.5,
+          size.height * 0.8,
+          size.width * 0.3,
+          size.height * 0.7,
+        );
+        lassoPath.quadraticBezierTo(
+          size.width * 0.2,
+          size.height * 0.5,
+          size.width * 0.3,
+          size.height * 0.3,
+        );
         canvas.drawPath(lassoPath, strokePaint);
         break;
     }
@@ -2959,7 +3153,7 @@ class DrawingPainter extends CustomPainter {
 
   void _drawLassoPath(Canvas canvas) {
     if (lassoPath == null || lassoPath!.length < 2) return;
-    
+
     final lassoPaint = Paint()
       ..color = Colors.blue.withOpacity(0.5)
       ..style = PaintingStyle.stroke
@@ -2970,17 +3164,18 @@ class DrawingPainter extends CustomPainter {
     // 点線を描画
     const dashWidth = 8.0;
     const dashSpace = 4.0;
-    
+
     for (int i = 0; i < lassoPath!.length - 1; i++) {
       final start = lassoPath![i];
       final end = lassoPath![i + 1];
       final distance = (end - start).distance;
       final direction = (end - start) / distance;
-      
+
       double currentDistance = 0.0;
       while (currentDistance < distance) {
         final dashStart = start + direction * currentDistance;
-        final dashEnd = start + direction * math.min(currentDistance + dashWidth, distance);
+        final dashEnd =
+            start + direction * math.min(currentDistance + dashWidth, distance);
         canvas.drawLine(dashStart, dashEnd, lassoPaint);
         currentDistance += dashWidth + dashSpace;
       }
@@ -2989,34 +3184,50 @@ class DrawingPainter extends CustomPainter {
 
   void _drawSelectionHighlight(Canvas canvas) {
     if (selectedStrokeIndices.isEmpty) return;
-    
+
     // 全体のバウンディングボックスを使用
     final bounds = selectionBounds;
     if (bounds == null) return;
-    
+
     final highlightPaint = Paint()
       ..color = Colors.blue.withOpacity(0.2)
       ..style = PaintingStyle.fill;
-    
+
     // ハイライトを描画
     canvas.drawRRect(
       RRect.fromRectAndRadius(bounds, const Radius.circular(4)),
       highlightPaint,
     );
-    
+
     // 選択ハンドルを描画（4つの角に小さな丸）
     final handlePaint = Paint()
       ..color = Colors.blue
       ..style = PaintingStyle.fill;
-    
+
     const handleSize = 12.0;
     const handleRadius = handleSize / 2;
-    
+
     // 左上、右上、左下、右下の順
-    canvas.drawCircle(Offset(bounds.left, bounds.top), handleRadius, handlePaint);
-    canvas.drawCircle(Offset(bounds.right, bounds.top), handleRadius, handlePaint);
-    canvas.drawCircle(Offset(bounds.left, bounds.bottom), handleRadius, handlePaint);
-    canvas.drawCircle(Offset(bounds.right, bounds.bottom), handleRadius, handlePaint);
+    canvas.drawCircle(
+      Offset(bounds.left, bounds.top),
+      handleRadius,
+      handlePaint,
+    );
+    canvas.drawCircle(
+      Offset(bounds.right, bounds.top),
+      handleRadius,
+      handlePaint,
+    );
+    canvas.drawCircle(
+      Offset(bounds.left, bounds.bottom),
+      handleRadius,
+      handlePaint,
+    );
+    canvas.drawCircle(
+      Offset(bounds.right, bounds.bottom),
+      handleRadius,
+      handlePaint,
+    );
   }
 
   void _drawRuler(Canvas canvas) {
@@ -3037,13 +3248,22 @@ class DrawingPainter extends CustomPainter {
     // 定規の幅
     final rulerWidth = 40.0;
     final angle = (rulerEnd - rulerStart).direction;
-    final perpendicular = Offset(-rulerWidth * 0.5 * math.sin(angle), rulerWidth * 0.5 * math.cos(angle));
+    final perpendicular = Offset(
+      -rulerWidth * 0.5 * math.sin(angle),
+      rulerWidth * 0.5 * math.cos(angle),
+    );
 
     final rulerRect = Path()
-      ..moveTo(rulerStart.dx + perpendicular.dx, rulerStart.dy + perpendicular.dy)
+      ..moveTo(
+        rulerStart.dx + perpendicular.dx,
+        rulerStart.dy + perpendicular.dy,
+      )
       ..lineTo(rulerEnd.dx + perpendicular.dx, rulerEnd.dy + perpendicular.dy)
       ..lineTo(rulerEnd.dx - perpendicular.dx, rulerEnd.dy - perpendicular.dy)
-      ..lineTo(rulerStart.dx - perpendicular.dx, rulerStart.dy - perpendicular.dy)
+      ..lineTo(
+        rulerStart.dx - perpendicular.dx,
+        rulerStart.dy - perpendicular.dy,
+      )
       ..close();
 
     canvas.drawPath(rulerRect, rulerFillPaint);
@@ -3053,10 +3273,10 @@ class DrawingPainter extends CustomPainter {
     final tickPaint = Paint()
       ..color = Colors.grey[600]!
       ..strokeWidth = 1;
-    
+
     final rulerLength = (rulerEnd - rulerStart).distance;
     final tickCount = (rulerLength / 20).floor();
-    
+
     for (int i = 0; i <= tickCount; i++) {
       final t = i / tickCount;
       final tickPos = Offset.lerp(rulerStart, rulerEnd, t)!;
@@ -3067,7 +3287,11 @@ class DrawingPainter extends CustomPainter {
     }
   }
 
-  void _drawStroke(Canvas canvas, List<DrawingPoint> stroke, {bool isSelected = false}) {
+  void _drawStroke(
+    Canvas canvas,
+    List<DrawingPoint> stroke, {
+    bool isSelected = false,
+  }) {
     if (stroke.length < 2) return;
 
     for (int i = 0; i < stroke.length - 1; i++) {
@@ -3086,7 +3310,9 @@ class DrawingPainter extends CustomPainter {
 
       // 選択されている場合は少し濃く描画
       if (isSelected && !point1.isEraser) {
-        paint.color = paint.color.withOpacity(math.min(1.0, paint.color.opacity + 0.2));
+        paint.color = paint.color.withOpacity(
+          math.min(1.0, paint.color.opacity + 0.2),
+        );
       }
 
       canvas.drawLine(point1.point, point2.point, paint);
@@ -3110,7 +3336,7 @@ class _SyncButtonState extends State<_SyncButton> {
 
   Future<void> _performSync() async {
     if (_isSyncing) return;
-    
+
     setState(() {
       _isSyncing = true;
     });
@@ -3121,7 +3347,7 @@ class _SyncButtonState extends State<_SyncButton> {
         SimpleDataManager.syncLocalDataToFirestore(),
         SimpleDataManager.syncLocalSettingsToFirestore(),
       ], eagerError: false);
-      
+
       // Firestoreからデータを取得してマージ（エラーが発生しても続行）
       try {
         await SimpleDataManager.initialize();
@@ -3129,7 +3355,7 @@ class _SyncButtonState extends State<_SyncButton> {
         print('Warning: Error initializing from Firestore: $e');
         // 初期化エラーは無視（ローカルデータは既に同期済み）
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -3146,7 +3372,7 @@ class _SyncButtonState extends State<_SyncButton> {
         final message = errorStr.contains('permission')
             ? 'Firestoreへのアクセス権限がありません。設定を確認してください。'
             : '同期中にエラーが発生しました。一部のデータは同期されていない可能性があります。';
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message),
@@ -3179,11 +3405,7 @@ class _SyncButtonState extends State<_SyncButton> {
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
               )
-            : Icon(
-                Icons.cloud_sync,
-                color: Colors.white,
-                size: 24.0,
-              ),
+            : Icon(Icons.cloud_sync, color: Colors.white, size: 24.0),
         onPressed: _isSyncing ? null : _performSync,
         tooltip: 'クラウドデータと同期',
       ),

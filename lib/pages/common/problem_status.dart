@@ -16,6 +16,8 @@ ProblemStatus keyToStatus(String k) {
   }
 }
 
-/// スロット数（定数）
+/// 問題一覧などで表示する履歴バッジ数
 const int slotCount = 3;
 
+/// 保持する学習履歴の最大件数
+const int learningHistoryRetentionCount = 10;

@@ -423,8 +423,7 @@ class _ProblemListPageState extends State<ProblemListPage> {
   Future<({int green, int red})>? _aggFuture;
 
   String? _lastVisibleAggKey;
-  Future<({int solved, int failed, int none})>?
-  _visibleAggFuture;
+  Future<({int solved, int failed, int none})>? _visibleAggFuture;
 
   @override
   void initState() {
@@ -441,7 +440,9 @@ class _ProblemListPageState extends State<ProblemListPage> {
       _visibleAggFuture = null;
       setState(() {});
     };
-    SimpleDataManager.learningDataEpochListenable.addListener(_learningEpochListener!);
+    SimpleDataManager.learningDataEpochListenable.addListener(
+      _learningEpochListener!,
+    );
   }
 
   @override
@@ -567,8 +568,9 @@ class _ProblemListPageState extends State<ProblemListPage> {
     return (green: green, red: red);
   }
 
-  Future<({int solved, int failed, int none})>
-  _aggregateVisibleStatusCounts(List<UnitExprProblem> visible) async {
+  Future<({int solved, int failed, int none})> _aggregateVisibleStatusCounts(
+    List<UnitExprProblem> visible,
+  ) async {
     int solved = 0;
     int failed = 0;
     int none = 0;
@@ -646,7 +648,10 @@ class _ProblemListPageState extends State<ProblemListPage> {
   Widget _aggregationDescriptionVisibleAllIcons(List<UnitExprProblem> visible) {
     // Key must reflect the actually visible list as well as filter settings,
     // otherwise aggregation can get stale when only the visible items change.
-    final totalUnitProblems = visible.fold<int>(0, (a, ep) => a + ep.unitProblems.length);
+    final totalUnitProblems = visible.fold<int>(
+      0,
+      (a, ep) => a + ep.unitProblems.length,
+    );
     final key = '${_aggKey()}|ep=${visible.length}|up=$totalUnitProblems';
     if (_visibleAggFuture == null || _lastVisibleAggKey != key) {
       _lastVisibleAggKey = key;
@@ -896,16 +901,12 @@ class _ProblemListPageState extends State<ProblemListPage> {
   String _buildSymbolDefTex(SymbolDef def) {
     final lang = AppLocale.languageCode(context);
     final symbolTex = def.texSymbol ?? formatSymbolToTex(def.symbol);
-    final rawName = def.localizedName(
-      lang,
-    );
+    final rawName = def.localizedName(lang);
     // TeXパーサが落ちる入力（改行/CRなど）を最低限サニタイズ
     final name = rawName.replaceAll('\r', ' ').replaceAll('\n', ' ');
 
     String unitPart = '';
-    final localizedUnit = def.localizedUnitSymbol(
-      lang,
-    );
+    final localizedUnit = def.localizedUnitSymbol(lang);
     if (localizedUnit != null && localizedUnit.isNotEmpty) {
       // 記号定義の unitSymbol は "m/s^2", "kg/m^3" のように / を含むことがある。
       // ここは Math.tex で描画するため、\text の入れ子を作らないフォーマッタを使う。
@@ -1039,8 +1040,7 @@ class _ProblemListPageState extends State<ProblemListPage> {
   ) {
     final l10n = AppLocalizations.of(context);
     final lang = AppLocale.languageCode(context);
-    final point = (unitProblem.localizedPoint(lang) ?? '')
-        .trim();
+    final point = (unitProblem.localizedPoint(lang) ?? '').trim();
     final hasPoint = point.isNotEmpty;
 
     return Padding(
@@ -1097,7 +1097,9 @@ class _ProblemListPageState extends State<ProblemListPage> {
                     ),
                   )
                 else ...[
-                  ...slots.take(3).toList().asMap().entries.map((slotEntry) {
+                  ...slots.take(_slotCount).toList().asMap().entries.map((
+                    slotEntry,
+                  ) {
                     final idx = slotEntry.key;
                     final slot = slotEntry.value;
                     final status =
@@ -1255,10 +1257,15 @@ class _ProblemListPageState extends State<ProblemListPage> {
             }
 
             return AlertDialog(
-              content: Text(l10n.purchaseDialogBody, style: const TextStyle(height: 1.4)),
+              content: Text(
+                l10n.purchaseDialogBody,
+                style: const TextStyle(height: 1.4),
+              ),
               actions: [
                 TextButton(
-                  onPressed: busy ? null : () => Navigator.of(dialogContext).pop(),
+                  onPressed: busy
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
                   child: Text(l10n.cancel),
                 ),
                 TextButton(
@@ -1266,13 +1273,18 @@ class _ProblemListPageState extends State<ProblemListPage> {
                       ? null
                       : () {
                           run(() async {
-                            final ok = await RevenueCatService.restorePurchases();
+                            final ok =
+                                await RevenueCatService.restorePurchases();
                             ProblemAccessService.clearCache();
                             if (!mounted) return;
                             Navigator.of(dialogContext).pop();
                             ScaffoldMessenger.of(this.context).showSnackBar(
                               SnackBar(
-                                content: Text(ok ? l10n.purchaseRestored : l10n.noPurchasesFound),
+                                content: Text(
+                                  ok
+                                      ? l10n.purchaseRestored
+                                      : l10n.noPurchasesFound,
+                                ),
                                 duration: const Duration(seconds: 2),
                               ),
                             );
@@ -1308,7 +1320,8 @@ class _ProblemListPageState extends State<ProblemListPage> {
                                       ? l10n.purchaseCompleted
                                       : (res.cancelled
                                             ? l10n.purchaseCancelled
-                                            : (res.error ?? l10n.purchaseFailed)),
+                                            : (res.error ??
+                                                  l10n.purchaseFailed)),
                                 ),
                                 duration: const Duration(seconds: 2),
                               ),

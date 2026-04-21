@@ -24,9 +24,6 @@ class ProgressInfo {
   });
 }
 
-/// スロット数（定数）
-const int _slotCount = 3;
-
 /// 実際のガチャの除外判定ロジックと同じ方法で問題をフィルタリングし、
 /// フィルタリングに引っかかった問題数を返す
 /// 単位ガチャの場合はUnitProblem単位でカウント（UnitProblemにつき1問）
@@ -131,7 +128,7 @@ Future<List<Map<String, dynamic>>> _getSlotsForProblem(MathProblem p) async {
   // 履歴を逆順にして、最新の記録を左から表示
   final reversedHistory = history.reversed.toList();
 
-  for (var i = 0; i < _slotCount; i++) {
+  for (var i = 0; i < slotCount; i++) {
     if (i < reversedHistory.length) {
       final h = reversedHistory[i];
       final status = ProblemStatus.values.firstWhere(
@@ -163,12 +160,12 @@ Future<ProgressInfo> getGachaProgress({
   // フィルタリング設定を取得
   final settings = await SimpleDataManager.getGachaSettings(prefsPrefix);
   final filterModeStr = settings['filterMode'] as String?;
-  
+
   // 単位ガチャの場合は実際の問題数をカウント（同じexprとmeaningを持つUnitProblemの数を合計）、それ以外はproblemPool.length
-  final totalCount = prefsPrefix == 'unit' 
-      ? unitGachaItems.length 
+  final totalCount = prefsPrefix == 'unit'
+      ? unitGachaItems.length
       : problemPool.length;
-  
+
   // filterModeが存在する場合はGachaFilterModeとして処理（全ガチャ共通）
   if (filterModeStr != null) {
     GachaFilterMode filterMode;
@@ -229,18 +226,17 @@ Future<ProgressInfo> getGachaProgress({
   }
 
   // filterModeが存在しない場合は除外なしとして返す（最新1回で集計）
-    // 最新1回の条件でフィルタリングして達成率を計算
-    final achievedCount = await getFilteredProblemCount(
-      prefsPrefix: prefsPrefix,
-      problemPool: problemPool,
-      filterMode: GachaFilterMode.excludeSolvedGE1,
-    );
-    
-    return ProgressInfo(
-      achievedCount: achievedCount,
-      totalCount: totalCount,
-      filterDescription: '最新1回の',
-      filterCount: 1,
-    );
-}
+  // 最新1回の条件でフィルタリングして達成率を計算
+  final achievedCount = await getFilteredProblemCount(
+    prefsPrefix: prefsPrefix,
+    problemPool: problemPool,
+    filterMode: GachaFilterMode.excludeSolvedGE1,
+  );
 
+  return ProgressInfo(
+    achievedCount: achievedCount,
+    totalCount: totalCount,
+    filterDescription: '最新1回の',
+    filterCount: 1,
+  );
+}

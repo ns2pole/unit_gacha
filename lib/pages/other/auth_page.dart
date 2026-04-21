@@ -1,5 +1,6 @@
 // lib/pages/auth_page.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -986,7 +987,12 @@ class _AuthPageState extends State<AuthPage> {
         }
       } else {
         setState(() {
-          _errorMessage = _t('Google Sign-Inに失敗しました', 'Google Sign-In failed.');
+          _errorMessage = kIsWeb
+              ? _t(
+                  'Google Sign-Inに失敗しました。\nポップアップがブロックされていないか確認して、もう一度お試しください。',
+                  'Google Sign-In failed.\nPlease allow the popup in your browser and try again.',
+                )
+              : _t('Google Sign-Inに失敗しました', 'Google Sign-In failed.');
         });
       }
     } catch (e) {
@@ -1006,6 +1012,14 @@ class _AuthPageState extends State<AuthPage> {
         errorMsg = _t(
           'ネットワークエラーが発生しました。\nインターネット接続を確認してください。',
           'Network error.\nPlease check your internet connection.',
+        );
+      } else if (kIsWeb &&
+          (e.toString().contains('popup') ||
+              e.toString().contains('cancelled-popup-request') ||
+              e.toString().contains('popup-blocked'))) {
+        errorMsg = _t(
+          'ブラウザのポップアップが開けませんでした。\nポップアップを許可して、もう一度お試しください。',
+          'The browser popup could not be opened.\nPlease allow popups and try again.',
         );
       }
       setState(() {

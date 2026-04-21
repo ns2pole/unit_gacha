@@ -1,6 +1,7 @@
 // lib/services/firebase_auth_service.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -132,6 +133,16 @@ class FirebaseAuthService {
         return null;
       }
 
+      if (kIsWeb) {
+        final provider = GoogleAuthProvider()
+          ..addScope('email')
+          ..addScope('profile')
+          ..setCustomParameters({'prompt': 'select_account'});
+
+        final userCredential = await _auth.signInWithPopup(provider);
+        return userCredential;
+      }
+
       // Google Sign-Inのインスタンスを作成
       // iOSではclientIdを明示的に指定する必要がある
       final GoogleSignIn googleSignIn = GoogleSignIn(
@@ -165,6 +176,13 @@ class FirebaseAuthService {
       // 通常のサインイン
       final userCredential = await _auth.signInWithCredential(credential);
       return userCredential;
+    } on FirebaseAuthException catch (e) {
+      print('FirebaseAuthException signing in with Google:');
+      print('  Code: ${e.code}');
+      print('  Message: ${e.message}');
+      print('  Email: ${e.email}');
+      print('  Credential: ${e.credential}');
+      return null;
     } catch (e) {
       print('Error signing in with Google: $e');
       return null;
