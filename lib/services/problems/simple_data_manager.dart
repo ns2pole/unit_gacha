@@ -247,11 +247,11 @@ class SimpleDataManager {
     if (notify) _notifyLearningDataChanged();
   }
 
-  static String _learningKey(String problemId) =>
-      '$_namespace/learning/$problemId';
+  static String _pendingLearningOpsKey(String problemId) =>
+      '$_namespace/learning_pending_ops/$problemId';
 
-  static bool get _isCloudAuthoritativeRead =>
-      kIsWeb && FirebaseAuthService.isAuthenticated;
+  static String _legacyLearningKey(String problemId) =>
+      '$_namespace/learning/$problemId';
 
   static DateTime? _tryParseDateTime(dynamic value) {
     if (value == null) return null;
@@ -279,10 +279,12 @@ class SimpleDataManager {
       status = rawStatus.key;
     }
 
-    final dt = _tryParseDateTime(raw['time']);
+    final updatedAtDt = _tryParseDateTime(raw['updatedAt'] ?? raw['time']);
+    final timeDt = _tryParseDateTime(raw['time'] ?? raw['updatedAt']);
     final normalized = <String, dynamic>{
       'status': status,
-      'time': dt?.toIso8601String(),
+      'time': timeDt?.toIso8601String(),
+      'updatedAt': updatedAtDt?.toIso8601String(),
     };
     final byCalc = raw['byCalculator'];
     if (byCalc is bool) {
@@ -291,39 +293,47 @@ class SimpleDataManager {
     return normalized;
   }
 
+  static String? _historyIdentity(Map<String, dynamic> record) {
+    final updatedAt = record['updatedAt'] as String?;
+    if (updatedAt != null && updatedAt.isNotEmpty) return updatedAt;
+    final time = record['time'] as String?;
+    if (time != null && time.isNotEmpty) return time;
+    return null;
+  }
+
   static List<Map<String, dynamic>> _normalizeHistoryList(
     dynamic historyAny, {
     int? maxEntries,
   }) {
-    final byTime = <String, Map<String, dynamic>>{};
+    final byIdentity = <String, Map<String, dynamic>>{};
     if (historyAny is List) {
       for (final raw in historyAny) {
         final normalized = _normalizeHistoryRecord(raw);
         if (normalized == null) continue;
-        final time = normalized['time'] as String?;
         final status = normalized['status'] as String? ?? 'none';
-        if (time == null || time.isEmpty || status == 'none') {
+        final identity = _historyIdentity(normalized);
+        if (identity == null || status == 'none') {
           continue;
         }
 
-        final prev = byTime[time];
+        final prev = byIdentity[identity];
         if (prev == null) {
-          byTime[time] = normalized;
+          byIdentity[identity] = normalized;
           continue;
         }
 
         final prevByCalc = prev['byCalculator'] == true;
         final nextByCalc = normalized['byCalculator'] == true;
         if (!prevByCalc && nextByCalc) {
-          byTime[time] = normalized;
+          byIdentity[identity] = normalized;
         }
       }
     }
 
-    final out = byTime.values.toList()
+    final out = byIdentity.values.toList()
       ..sort((a, b) {
-        final timeA = _tryParseDateTime(a['time']);
-        final timeB = _tryParseDateTime(b['time']);
+        final timeA = _tryParseDateTime(a['updatedAt'] ?? a['time']);
+        final timeB = _tryParseDateTime(b['updatedAt'] ?? b['time']);
         if (timeA == null && timeB == null) return 0;
         if (timeA == null) return -1;
         if (timeB == null) return 1;
@@ -341,199 +351,291 @@ class SimpleDataManager {
     return history.last['status'] as String? ?? 'none';
   }
 
-  static String _deriveMergedLastUpdated({
+  static String _deriveLastUpdated({
     required List<Map<String, dynamic>> history,
-    Map<String, dynamic>? localData,
-    Map<String, dynamic>? remoteData,
+    String? fallbackUpdatedAt,
   }) {
     DateTime? newest;
 
     final historyTime = history.isNotEmpty
-        ? _tryParseDateTime(history.last['time'])
+        ? _tryParseDateTime(history.last['updatedAt'] ?? history.last['time'])
         : null;
     if (historyTime != null) newest = historyTime;
 
-    final localUpdated = _tryParseDateTime(localData?['lastUpdated']);
-    if (localUpdated != null &&
-        (newest == null || localUpdated.isAfter(newest))) {
-      newest = localUpdated;
-    }
-
-    final remoteUpdated = _tryParseDateTime(remoteData?['lastUpdated']);
-    if (remoteUpdated != null &&
-        (newest == null || remoteUpdated.isAfter(newest))) {
-      newest = remoteUpdated;
+    final fallback = _tryParseDateTime(fallbackUpdatedAt);
+    if (fallback != null && (newest == null || fallback.isAfter(newest))) {
+      newest = fallback;
     }
 
     return (newest ?? DateTime.now()).toIso8601String();
   }
 
-  static Map<String, dynamic> _mergeLearningRecordData({
+  static Map<String, dynamic> _buildLearningRecordData({
     required String problemId,
-    Map<String, dynamic>? localData,
-    Map<String, dynamic>? remoteData,
-    bool preferRemoteMetadata = false,
+    required List<Map<String, dynamic>> history,
+    String? fallbackUpdatedAt,
   }) {
-    final localHistory = _normalizeHistoryList(
-      localData?['history'],
+    final normalizedHistory = _normalizeHistoryList(
+      history,
       maxEntries: learningHistoryRetentionCount,
     );
-    final remoteHistory = _normalizeHistoryList(
-      remoteData?['history'],
-      maxEntries: learningHistoryRetentionCount,
-    );
-    final mergedHistory = _normalizeHistoryList([
-      ...localHistory,
-      ...remoteHistory,
-    ], maxEntries: learningHistoryRetentionCount);
+    return {
+      'problemId': problemId,
+      'history': normalizedHistory,
+      'latestStatus': _deriveLatestStatus(normalizedHistory),
+      'lastUpdated': _deriveLastUpdated(
+        history: normalizedHistory,
+        fallbackUpdatedAt: fallbackUpdatedAt,
+      ),
+    };
+  }
 
-    final localUpdated = _tryParseDateTime(localData?['lastUpdated']);
-    final remoteUpdated = _tryParseDateTime(remoteData?['lastUpdated']);
-
-    Map<String, dynamic>? base;
-    if (localData != null && remoteData != null) {
-      if (preferRemoteMetadata) {
-        base = Map<String, dynamic>.from(remoteData);
-      } else if (remoteUpdated != null &&
-          (localUpdated == null || remoteUpdated.isAfter(localUpdated))) {
-        base = Map<String, dynamic>.from(remoteData);
-      } else {
-        base = Map<String, dynamic>.from(localData);
-      }
-    } else if (remoteData != null) {
-      base = Map<String, dynamic>.from(remoteData);
-    } else if (localData != null) {
-      base = Map<String, dynamic>.from(localData);
-    } else {
-      base = <String, dynamic>{};
+  static Map<String, dynamic>? _normalizePendingOperation(dynamic raw) {
+    if (raw is! Map) return null;
+    final kind = raw['kind'] as String?;
+    final updatedAt =
+        _tryParseDateTime(raw['updatedAt'])?.toIso8601String() ??
+        DateTime.now().toIso8601String();
+    switch (kind) {
+      case 'append':
+        final log = _normalizeHistoryRecord(raw['log']);
+        if (log == null) return null;
+        return {'kind': 'append', 'updatedAt': updatedAt, 'log': log};
+      case 'replace':
+        return {
+          'kind': 'replace',
+          'updatedAt': updatedAt,
+          'history': _normalizeHistoryList(
+            raw['history'],
+            maxEntries: learningHistoryRetentionCount,
+          ),
+        };
+      case 'clear':
+        return {'kind': 'clear', 'updatedAt': updatedAt};
+      default:
+        return null;
     }
-
-    base['problemId'] = problemId;
-    base['history'] = mergedHistory;
-    base['latestStatus'] = _deriveLatestStatus(mergedHistory);
-    base['lastUpdated'] = _deriveMergedLastUpdated(
-      history: mergedHistory,
-      localData: localData,
-      remoteData: remoteData,
-    );
-    return base;
   }
 
-  static bool _learningRecordContentsEqual(
-    Map<String, dynamic>? a,
-    Map<String, dynamic>? b,
-  ) {
-    if (a == null && b == null) return true;
-    if (a == null || b == null) return false;
-
-    final historyA = _normalizeHistoryList(
-      a['history'],
-      maxEntries: learningHistoryRetentionCount,
-    );
-    final historyB = _normalizeHistoryList(
-      b['history'],
-      maxEntries: learningHistoryRetentionCount,
-    );
-    if (json.encode(historyA) != json.encode(historyB)) {
-      return false;
-    }
-
-    final latestA = _deriveLatestStatus(historyA);
-    final latestB = _deriveLatestStatus(historyB);
-    return latestA == latestB;
-  }
-
-  static bool _learningRecordFullyEqual(
-    Map<String, dynamic>? a,
-    Map<String, dynamic>? b,
-  ) {
-    if (!_learningRecordContentsEqual(a, b)) return false;
-    return _tryParseDateTime(a?['lastUpdated']) ==
-        _tryParseDateTime(b?['lastUpdated']);
-  }
-
-  static Future<Map<String, dynamic>?> _loadLearningRecordById(
+  static Future<List<Map<String, dynamic>>> _loadPendingLearningOperations(
     SharedPreferences prefs,
     String problemId,
   ) async {
-    final dataString = prefs.getString(_learningKey(problemId));
-    if (dataString == null || dataString.isEmpty) return null;
-    try {
-      final decoded = json.decode(dataString);
-      if (decoded is Map<String, dynamic>) {
-        return Map<String, dynamic>.from(decoded);
-      }
-      if (decoded is Map) {
-        return Map<String, dynamic>.from(decoded);
-      }
-    } catch (_) {}
-    return null;
+    final raw = prefs.getString(_pendingLearningOpsKey(problemId));
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = json.decode(raw);
+        if (decoded is List) {
+          return decoded
+              .map(_normalizePendingOperation)
+              .whereType<Map<String, dynamic>>()
+              .toList();
+        }
+      } catch (_) {}
+    }
+
+    final legacyRaw = prefs.getString(_legacyLearningKey(problemId));
+    if (legacyRaw != null && legacyRaw.isNotEmpty) {
+      try {
+        final decoded = json.decode(legacyRaw);
+        final history = decoded is Map<String, dynamic>
+            ? _normalizeHistoryList(
+                decoded['history'],
+                maxEntries: learningHistoryRetentionCount,
+              )
+            : _normalizeHistoryList(
+                decoded,
+                maxEntries: learningHistoryRetentionCount,
+              );
+        if (history.isNotEmpty) {
+          final migrated = [
+            {
+              'kind': 'replace',
+              'updatedAt':
+                  (decoded is Map<String, dynamic>
+                      ? decoded['lastUpdated'] as String?
+                      : null) ??
+                  _deriveLastUpdated(history: history),
+              'history': history,
+            },
+          ];
+          await prefs.setString(
+            _pendingLearningOpsKey(problemId),
+            json.encode(migrated),
+          );
+          await prefs.remove(_legacyLearningKey(problemId));
+          return migrated;
+        }
+        await prefs.remove(_legacyLearningKey(problemId));
+      } catch (_) {}
+    }
+    return const [];
   }
 
-  static Future<bool> _saveLearningRecordById(
+  static Future<void> _savePendingLearningOperations(
     SharedPreferences prefs,
     String problemId,
-    Map<String, dynamic> data, {
+    List<Map<String, dynamic>> operations, {
     bool notify = true,
   }) async {
-    final existing = await _loadLearningRecordById(prefs, problemId);
-    final changed = !_learningRecordFullyEqual(existing, data);
-    if (!changed) return false;
-
-    final encoded = json.encode(data);
-    await prefs.setString(_learningKey(problemId), encoded);
-    _learningDataCache[problemId] = Map<String, dynamic>.from(data);
-    _learningHistoryCache[problemId] = _normalizeHistoryList(
-      data['history'],
-      maxEntries: learningHistoryRetentionCount,
-    );
+    final normalized = operations
+        .map(_normalizePendingOperation)
+        .whereType<Map<String, dynamic>>()
+        .toList();
+    if (normalized.isEmpty) {
+      await prefs.remove(_pendingLearningOpsKey(problemId));
+    } else {
+      await prefs.setString(
+        _pendingLearningOpsKey(problemId),
+        json.encode(normalized),
+      );
+    }
+    await prefs.remove(_legacyLearningKey(problemId));
+    _learningHistoryCache.remove(problemId);
+    _learningDataCache.remove(problemId);
     if (notify) _notifyLearningDataChanged();
-    return true;
   }
 
-  static Future<Map<String, dynamic>?> _reconcileLearningRecordForProblem({
-    required SharedPreferences prefs,
-    required String userId,
-    required String problemId,
-    Map<String, dynamic>? localData,
-    bool pushMergedToFirestore = false,
-    bool preferRemoteMetadata = false,
-  }) async {
-    Map<String, dynamic>? remoteData;
-    try {
-      remoteData = await FirestoreLearningService.getLearningRecord(
-        userId: userId,
-        problemId: problemId,
-      );
-    } catch (_) {}
-
-    final merged = _mergeLearningRecordData(
-      problemId: problemId,
-      localData: localData,
-      remoteData: remoteData,
-      preferRemoteMetadata: preferRemoteMetadata,
+  static List<Map<String, dynamic>> _applyPendingLearningOperations(
+    List<Map<String, dynamic>> baseHistory,
+    List<Map<String, dynamic>> operations,
+  ) {
+    var history = _normalizeHistoryList(
+      baseHistory,
+      maxEntries: learningHistoryRetentionCount,
     );
+    for (final operation in operations) {
+      switch (operation['kind']) {
+        case 'append':
+          history = _normalizeHistoryList([
+            ...history,
+            operation['log'],
+          ], maxEntries: learningHistoryRetentionCount);
+          break;
+        case 'replace':
+          history = _normalizeHistoryList(
+            operation['history'],
+            maxEntries: learningHistoryRetentionCount,
+          );
+          break;
+        case 'clear':
+          history = const [];
+          break;
+      }
+    }
+    return history;
+  }
 
-    final localChanged = await _saveLearningRecordById(
+  static Future<Map<String, dynamic>?> _fetchCloudLearningRecord(
+    String userId,
+    String problemId,
+  ) async {
+    final remote = await FirestoreLearningService.getLearningRecord(
+      userId: userId,
+      problemId: problemId,
+    );
+    if (remote == null) return null;
+    return _buildLearningRecordData(
+      problemId: problemId,
+      history: _normalizeHistoryList(
+        remote['history'],
+        maxEntries: learningHistoryRetentionCount,
+      ),
+      fallbackUpdatedAt: remote['lastUpdated'] as String?,
+    );
+  }
+
+  static Future<Map<String, dynamic>> _resolveDisplayLearningData(
+    String problemId,
+  ) async {
+    final canUseCache = !FirebaseAuthService.isAuthenticated;
+    final cached = _learningDataCache[problemId];
+    if (canUseCache && cached != null) return Map<String, dynamic>.from(cached);
+
+    final prefs = await SharedPreferences.getInstance();
+    final pendingOperations = await _loadPendingLearningOperations(
       prefs,
       problemId,
-      merged,
-      notify: false,
     );
 
-    if (pushMergedToFirestore &&
-        !_learningRecordContentsEqual(remoteData, merged)) {
-      await FirestoreLearningService.saveLearningRecord(
-        userId: userId,
-        problemId: problemId,
-        data: merged,
-      );
+    Map<String, dynamic>? cloudData;
+    final userId = FirebaseAuthService.userId;
+    if (FirebaseAuthService.isAuthenticated && userId != null) {
+      try {
+        cloudData = await _fetchCloudLearningRecord(userId, problemId);
+      } catch (_) {
+        cloudData = null;
+      }
     }
 
-    if (localChanged) {
-      _notifyLearningDataChanged();
+    final resolvedHistory = _applyPendingLearningOperations(
+      cloudData?['history'] as List<Map<String, dynamic>>? ?? const [],
+      pendingOperations,
+    );
+    final resolved = _buildLearningRecordData(
+      problemId: problemId,
+      history: resolvedHistory,
+      fallbackUpdatedAt: cloudData?['lastUpdated'] as String?,
+    );
+    if (canUseCache) {
+      _learningDataCache[problemId] = Map<String, dynamic>.from(resolved);
+      _learningHistoryCache[problemId] = List<Map<String, dynamic>>.from(
+        resolvedHistory,
+      );
     }
-    return merged;
+    return Map<String, dynamic>.from(resolved);
+  }
+
+  static Future<void> _enqueuePendingLearningOperation(
+    String problemId,
+    Map<String, dynamic> operation,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final existing = await _loadPendingLearningOperations(prefs, problemId);
+    existing.add(operation);
+    await _savePendingLearningOperations(prefs, problemId, existing);
+  }
+
+  static Future<bool> _syncPendingLearningRecord(
+    SharedPreferences prefs,
+    String userId,
+    String problemId,
+  ) async {
+    final pendingOperations = await _loadPendingLearningOperations(
+      prefs,
+      problemId,
+    );
+    if (pendingOperations.isEmpty) return false;
+
+    final cloudData = await _fetchCloudLearningRecord(userId, problemId);
+    final mergedHistory = _applyPendingLearningOperations(
+      cloudData?['history'] as List<Map<String, dynamic>>? ?? const [],
+      pendingOperations,
+    );
+    final mergedRecord = _buildLearningRecordData(
+      problemId: problemId,
+      history: mergedHistory,
+      fallbackUpdatedAt: cloudData?['lastUpdated'] as String?,
+    );
+    final success = await FirestoreLearningService.saveLearningRecord(
+      userId: userId,
+      problemId: problemId,
+      data: mergedRecord,
+    );
+    if (!success) return false;
+
+    await _savePendingLearningOperations(
+      prefs,
+      problemId,
+      const [],
+      notify: false,
+    );
+    _learningDataCache[problemId] = Map<String, dynamic>.from(mergedRecord);
+    _learningHistoryCache[problemId] = List<Map<String, dynamic>>.from(
+      mergedHistory,
+    );
+    _notifyLearningDataChanged();
+    return true;
   }
 
   // ============================================================================
@@ -555,14 +657,9 @@ class SimpleDataManager {
         AppLogger.success('SimpleDataManagerの初期化が完了しました');
       }
 
-      // 認証済みユーザーの場合、Firestoreと再同期
+      // 認証済みユーザーの場合、未同期データがあればクラウドへ反映する
       if (FirebaseAuthService.isAuthenticated) {
-        await _withCloudSyncIndicator(() async {
-          await _syncFromFirestore(pushMergedToFirestore: true);
-          // オフライン時に溜めた解答イベントがあれば、ここで送る（UIをブロックしない範囲で）
-          // 失敗しても次回同期（クラウド同期ボタン）で再試行される
-          unawaited(syncUnitGachaAttemptEventsToFirestore().then((_) {}));
-        });
+        await syncLocalDataToFirestore();
       }
 
       return true;
@@ -835,110 +932,6 @@ class SimpleDataManager {
         json.encode(r.toJson()),
       );
     } catch (_) {}
-  }
-
-  /// Firestoreからデータを同期（認証済みユーザー用）
-  static Future<void> _syncFromFirestore({
-    bool pushMergedToFirestore = true,
-  }) async {
-    try {
-      final userId = FirebaseAuthService.userId;
-      if (userId == null) return;
-
-      final prefs = await SharedPreferences.getInstance();
-      final syncKey = '$_namespace/firestore_sync_completed_$userId';
-
-      // 全学習記録を取得（タイムアウト付き）
-      Map<String, Map<String, dynamic>> firestoreRecords;
-      try {
-        firestoreRecords =
-            await FirestoreLearningService.getAllLearningRecords(
-              userId: userId,
-            ).timeout(
-              const Duration(seconds: 10),
-              onTimeout: () {
-                print(
-                  '⚠️ Timeout getting learning records from Firestore for user: $userId',
-                );
-                return <String, Map<String, dynamic>>{};
-              },
-            );
-      } catch (e) {
-        final errorStr = e.toString().toLowerCase();
-        if (errorStr.contains('permission') ||
-            errorStr.contains('permission-denied')) {
-          print(
-            '⚠️ Permission denied getting learning records from Firestore for user: $userId',
-          );
-          print(
-            '⚠️ Firestoreセキュリティルールを確認してください。FIRESTORE_SECURITY_RULES.mdを参照してください。',
-          );
-          // 権限エラーの場合は設定のみ同期を試みる
-          await _syncSettingsFromFirestore(userId);
-          return;
-        }
-        print(
-          'Error getting learning records from Firestore for user: $userId - $e',
-        );
-        firestoreRecords = {};
-      }
-
-      final localProblemIds = prefs
-          .getKeys()
-          .where(
-            (key) =>
-                key.startsWith('$_namespace/learning/') &&
-                key != '$_namespace/learning',
-          )
-          .map((key) => key.replaceFirst('$_namespace/learning/', ''));
-      final allProblemIds = <String>{
-        ...firestoreRecords.keys,
-        ...localProblemIds,
-      };
-
-      var hasLocalChanges = false;
-      for (final problemId in allProblemIds) {
-        final localData = await _loadLearningRecordById(prefs, problemId);
-        final firestoreData = firestoreRecords[problemId];
-        final mergedData = _mergeLearningRecordData(
-          problemId: problemId,
-          localData: localData,
-          remoteData: firestoreData,
-          preferRemoteMetadata: _isCloudAuthoritativeRead,
-        );
-
-        final localChanged = await _saveLearningRecordById(
-          prefs,
-          problemId,
-          mergedData,
-          notify: false,
-        );
-        hasLocalChanges = hasLocalChanges || localChanged;
-
-        if (pushMergedToFirestore &&
-            !_learningRecordContentsEqual(firestoreData, mergedData)) {
-          await FirestoreLearningService.saveLearningRecord(
-            userId: userId,
-            problemId: problemId,
-            data: mergedData,
-          );
-        }
-      }
-
-      // 設定を同期
-      await _syncSettingsFromFirestore(userId);
-
-      // 同期完了時刻を記録
-      await prefs.setString(syncKey, DateTime.now().toIso8601String());
-
-      AppLogger.success('Firestoreからのデータ同期が完了しました');
-      if (hasLocalChanges) {
-        _invalidateLearningCaches();
-      }
-    } catch (e) {
-      AppLogger.error('Firestoreからのデータ同期に失敗しました', error: e);
-      // エラー時も処理を継続
-    }
   }
 
   /// Firestoreから設定を同期（内部メソッド）
@@ -1438,8 +1431,27 @@ class SimpleDataManager {
       }
 
       await _withCloudSyncIndicator(() async {
-        print('Starting reconciled data sync to Firestore for user: $userId');
-        await _syncFromFirestore(pushMergedToFirestore: true);
+        print('Starting pending learning log sync for user: $userId');
+        final prefs = await SharedPreferences.getInstance();
+        final pendingProblemIds =
+            prefs
+                .getKeys()
+                .where(
+                  (key) => key.startsWith('$_namespace/learning_pending_ops/'),
+                )
+                .map(
+                  (key) =>
+                      key.replaceFirst('$_namespace/learning_pending_ops/', ''),
+                )
+                .toList()
+              ..sort();
+        for (final problemId in pendingProblemIds) {
+          try {
+            await _syncPendingLearningRecord(prefs, userId, problemId);
+          } catch (e) {
+            print('Error syncing pending learning record $problemId: $e');
+          }
+        }
         // 解答イベント（ランキング用）も同期
         await syncUnitGachaAttemptEventsToFirestore();
       });
@@ -1459,65 +1471,39 @@ class SimpleDataManager {
     bool byCalculator = false,
   }) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final existingData = await _getLearningData(problem);
       final statusKey = status is LearningStatus
           ? status.key
           : status is ProblemStatus
           ? status.name
           : 'none';
+      if (statusKey == 'none') return true;
 
-      final history = _normalizeHistoryList(
-        existingData['history'],
-        maxEntries: learningHistoryRetentionCount,
-      );
-      if (statusKey != 'none') {
-        history.add({
+      final nowIso = DateTime.now().toIso8601String();
+      await _enqueuePendingLearningOperation(problem.id, {
+        'kind': 'append',
+        'updatedAt': nowIso,
+        'log': {
           'status': statusKey,
-          'time': DateTime.now().toIso8601String(),
+          'time': nowIso,
+          'updatedAt': nowIso,
           if (byCalculator) 'byCalculator': true,
-        });
-      }
-
-      final nextData = _mergeLearningRecordData(
-        problemId: problem.id,
-        localData: existingData,
-        remoteData: {
-          'problemId': problem.id,
-          'history': history,
-          'latestStatus': statusKey,
-          'lastUpdated': DateTime.now().toIso8601String(),
         },
-      );
+      });
 
-      await _saveLearningRecordById(prefs, problem.id, nextData);
-
-      // 認証済みユーザーの場合、Firestoreにも同時に保存
       if (FirebaseAuthService.isAuthenticated) {
         final userId = FirebaseAuthService.userId;
         if (userId != null) {
           try {
-            await _reconcileLearningRecordForProblem(
-              prefs: prefs,
-              userId: userId,
-              problemId: problem.id,
-              localData: nextData,
-              pushMergedToFirestore: true,
-              preferRemoteMetadata: _isCloudAuthoritativeRead,
-            );
+            final prefs = await SharedPreferences.getInstance();
+            await _syncPendingLearningRecord(prefs, userId, problem.id);
             print(
-              'Successfully reconciled learning record for problem ${problem.id}',
+              'Successfully synced learning record for problem ${problem.id}',
             );
           } catch (e, stackTrace) {
             print('Error saving to Firestore (continuing with local save): $e');
             print('Stack trace: $stackTrace');
-            // Firestoreエラー時はローカルのみで動作継続
           }
-        } else {
-          print('Warning: User ID is null, skipping Firestore sync');
         }
-      } else {
-        print('User not authenticated, skipping Firestore sync');
       }
 
       return true;
@@ -1531,45 +1517,8 @@ class SimpleDataManager {
   /// ローカルデータを優先して即座に返し、バックグラウンドでFirestoreと同期
   static Future<LearningStatus> getLearningRecord(MathProblem problem) async {
     try {
-      final localData = await _getLearningData(problem);
-
-      if (FirebaseAuthService.isAuthenticated) {
-        final userId = FirebaseAuthService.userId;
-        if (userId != null) {
-          final prefs = await SharedPreferences.getInstance();
-          if (_isCloudAuthoritativeRead) {
-            final merged = await _reconcileLearningRecordForProblem(
-              prefs: prefs,
-              userId: userId,
-              problemId: problem.id,
-              localData: localData,
-              pushMergedToFirestore: false,
-              preferRemoteMetadata: true,
-            );
-            final statusKey = merged?['latestStatus'] as String?;
-            return statusKey != null
-                ? LearningStatusExtension.fromKey(statusKey)
-                : LearningStatus.none;
-          }
-
-          unawaited(() async {
-            try {
-              await _reconcileLearningRecordForProblem(
-                prefs: prefs,
-                userId: userId,
-                problemId: problem.id,
-                localData: localData,
-                pushMergedToFirestore: false,
-                preferRemoteMetadata: false,
-              );
-            } catch (e) {
-              print('Background sync error (ignored): $e');
-            }
-          }());
-        }
-      }
-
-      final statusKey = localData['latestStatus'] as String?;
+      final data = await _resolveDisplayLearningData(problem.id);
+      final statusKey = data['latestStatus'] as String?;
       if (statusKey != null) {
         return LearningStatusExtension.fromKey(statusKey);
       }
@@ -1587,88 +1536,62 @@ class SimpleDataManager {
     dynamic problem,
   ) async {
     try {
-      final cached = _learningHistoryCache[problem.id];
-      if (cached != null) return cached;
-
-      final localData = await _getLearningData(problem);
-      final history = _normalizeHistoryList(
-        localData['history'],
-        maxEntries: learningHistoryRetentionCount,
-      );
-
-      if (FirebaseAuthService.isAuthenticated) {
-        final userId = FirebaseAuthService.userId;
-        if (userId != null) {
-          final prefs = await SharedPreferences.getInstance();
-          if (_isCloudAuthoritativeRead) {
-            final merged = await _reconcileLearningRecordForProblem(
-              prefs: prefs,
-              userId: userId,
-              problemId: problem.id,
-              localData: localData,
-              pushMergedToFirestore: false,
-              preferRemoteMetadata: true,
-            );
-            final mergedHistory = _normalizeHistoryList(
-              merged?['history'],
-              maxEntries: learningHistoryRetentionCount,
-            );
-            _learningHistoryCache[problem.id] = mergedHistory;
-            return mergedHistory;
-          }
-
-          unawaited(() async {
-            try {
-              await _reconcileLearningRecordForProblem(
-                prefs: prefs,
-                userId: userId,
-                problemId: problem.id,
-                localData: localData,
-                pushMergedToFirestore: false,
-                preferRemoteMetadata: false,
-              );
-            } catch (e) {
-              print('Background sync error (ignored): $e');
-            }
-          }());
-        }
-      }
-
-      final migratedHistory = history.map((h) {
-        final status = h['status'] as String?;
-        final time = h['time'] as String?;
-        final byCalc = h['byCalculator'];
-
-        // 古い形式（LearningStatus.key）を新しい形式（ProblemStatus.name）に変換
-        String newStatus;
-        switch (status) {
-          case 'solved':
-            newStatus = 'solved';
-            break;
-          case 'understood':
-            newStatus = 'understood';
-            break;
-          case 'failed':
-            newStatus = 'failed';
-            break;
-          default:
-            newStatus = 'none';
-        }
-
-        final out = <String, dynamic>{'status': newStatus, 'time': time};
-        if (byCalc is bool) {
-          out['byCalculator'] = byCalc;
-        }
-        return out;
-      }).toList();
-
-      _learningHistoryCache[problem.id] = migratedHistory;
-      return migratedHistory;
+      return _getLearningHistoryForProblemId(problem.id);
     } catch (e) {
       print('Error getting learning history: $e');
       // エラー時は空のリストを返す（問題は除外されない）
       return [];
     }
+  }
+
+  static Future<List<Map<String, dynamic>>> _getLearningHistoryForProblemId(
+    String problemId,
+  ) async {
+    final canUseCache = !FirebaseAuthService.isAuthenticated;
+    final cached = _learningHistoryCache[problemId];
+    if (canUseCache && cached != null) return cached;
+
+    final data = await _resolveDisplayLearningData(problemId);
+    final history = _normalizeHistoryList(
+      data['history'],
+      maxEntries: learningHistoryRetentionCount,
+    );
+
+    final migratedHistory = history.map((h) {
+      final status = h['status'] as String?;
+      final time = h['time'] as String?;
+      final byCalc = h['byCalculator'];
+
+      String newStatus;
+      switch (status) {
+        case 'solved':
+          newStatus = 'solved';
+          break;
+        case 'understood':
+          newStatus = 'understood';
+          break;
+        case 'failed':
+          newStatus = 'failed';
+          break;
+        default:
+          newStatus = 'none';
+      }
+
+      final out = <String, dynamic>{'status': newStatus, 'time': time};
+      if (byCalc is bool) {
+        out['byCalculator'] = byCalc;
+      }
+      final updatedAt = h['updatedAt'] as String?;
+      if (updatedAt != null) {
+        out['updatedAt'] = updatedAt;
+      }
+      return out;
+    }).toList();
+
+    if (canUseCache) {
+      _learningHistoryCache[problemId] = migratedHistory;
+    }
+    return migratedHistory;
   }
 
   /// 複数問題の履歴を一括取得（SharedPreferencesアクセス回数を最小化）
@@ -1680,8 +1603,6 @@ class SimpleDataManager {
   ) async {
     final ids = problemIds.toSet();
     if (ids.isEmpty) return {};
-
-    final prefs = await SharedPreferences.getInstance();
     final out = <String, List<Map<String, dynamic>>>{};
 
     for (final id in ids) {
@@ -1691,67 +1612,8 @@ class SimpleDataManager {
         continue;
       }
 
-      final key = '$_namespace/learning/$id';
-      final dataString = prefs.getString(key);
-      if (dataString == null) {
-        _learningHistoryCache[id] = const [];
-        out[id] = const [];
-        continue;
-      }
-
-      try {
-        final decoded = json.decode(dataString);
-        if (decoded is Map<String, dynamic>) {
-          final historyAny = decoded['history'];
-          final history = <Map<String, dynamic>>[];
-          if (historyAny is List) {
-            for (final h in historyAny) {
-              if (h is Map) {
-                final status = h['status'];
-                final time = h['time'];
-                final byCalc = h['byCalculator'];
-                history.add({
-                  'status': status is String ? status : 'none',
-                  'time': time is String ? time : null,
-                  if (byCalc is bool) 'byCalculator': byCalc,
-                });
-              }
-            }
-          }
-
-          final migratedHistory = history.map((h) {
-            final status = h['status'] as String?;
-            final time = h['time'] as String?;
-            final byCalc = h['byCalculator'];
-            String newStatus;
-            switch (status) {
-              case 'solved':
-                newStatus = 'solved';
-                break;
-              case 'understood':
-                newStatus = 'understood';
-                break;
-              case 'failed':
-                newStatus = 'failed';
-                break;
-              default:
-                newStatus = 'none';
-            }
-            final out = <String, dynamic>{'status': newStatus, 'time': time};
-            if (byCalc is bool) out['byCalculator'] = byCalc;
-            return out;
-          }).toList();
-
-          _learningHistoryCache[id] = migratedHistory;
-          out[id] = migratedHistory;
-        } else {
-          _learningHistoryCache[id] = const [];
-          out[id] = const [];
-        }
-      } catch (_) {
-        _learningHistoryCache[id] = const [];
-        out[id] = const [];
-      }
+      final history = await _getLearningHistoryForProblemId(id);
+      out[id] = history;
     }
 
     return out;
@@ -1763,40 +1625,25 @@ class SimpleDataManager {
     List<Map<String, dynamic>> history,
   ) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final existingData = await _getLearningData(problem);
       final normalizedHistory = _normalizeHistoryList(
         history,
         maxEntries: learningHistoryRetentionCount,
       );
-      final nextData = _mergeLearningRecordData(
-        problemId: problem.id,
-        localData: existingData,
-        remoteData: {
-          'problemId': problem.id,
-          'history': normalizedHistory,
-          'latestStatus': _deriveLatestStatus(normalizedHistory),
-          'lastUpdated': DateTime.now().toIso8601String(),
-        },
-      );
+      final nowIso = DateTime.now().toIso8601String();
+      await _enqueuePendingLearningOperation(problem.id, {
+        'kind': 'replace',
+        'updatedAt': nowIso,
+        'history': normalizedHistory,
+      });
 
-      await _saveLearningRecordById(prefs, problem.id, nextData);
-
-      // 認証済みユーザーの場合、Firestoreにも同時に保存
       if (FirebaseAuthService.isAuthenticated) {
         final userId = FirebaseAuthService.userId;
         if (userId != null) {
           try {
-            await _reconcileLearningRecordForProblem(
-              prefs: prefs,
-              userId: userId,
-              problemId: problem.id,
-              localData: nextData,
-              pushMergedToFirestore: true,
-              preferRemoteMetadata: _isCloudAuthoritativeRead,
-            );
+            final prefs = await SharedPreferences.getInstance();
+            await _syncPendingLearningRecord(prefs, userId, problem.id);
             print(
-              'Successfully saved learning history to Firestore for problem ${problem.id}',
+              'Successfully saved learning history for problem ${problem.id}',
             );
           } catch (e, stackTrace) {
             print(
@@ -1832,75 +1679,24 @@ class SimpleDataManager {
   /// 空の履歴をローカルとクラウドへ保存し、次回同期で古い記録が復活しないようにする
   static Future<bool> clearLearningHistory(dynamic problem) async {
     try {
-      final success = await saveLearningHistory(problem, const []);
+      final nowIso = DateTime.now().toIso8601String();
+      await _enqueuePendingLearningOperation(problem.id, {
+        'kind': 'clear',
+        'updatedAt': nowIso,
+      });
 
-      if (success) {
-        print(
-          'Successfully cleared learning history (set all slots to none) for problem ${problem.id}',
-        );
-      } else {
-        print(
-          'Warning: Failed to clear learning history for problem ${problem.id}',
-        );
+      if (FirebaseAuthService.isAuthenticated) {
+        final userId = FirebaseAuthService.userId;
+        if (userId != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await _syncPendingLearningRecord(prefs, userId, problem.id);
+        }
       }
-
-      return success;
+      print('Successfully cleared learning history for problem ${problem.id}');
+      return true;
     } catch (e) {
       print('Error clearing learning history: $e');
       return false;
-    }
-  }
-
-  /// 学習データを取得（内部メソッド）
-  static Future<Map<String, dynamic>> _getLearningData(dynamic problem) async {
-    try {
-      final cached = _learningDataCache[problem.id];
-      if (cached != null) return Map<String, dynamic>.from(cached);
-
-      final prefs = await SharedPreferences.getInstance();
-      final key = '$_namespace/learning/${problem.id}';
-      final dataString = prefs.getString(key);
-
-      if (dataString != null) {
-        final decoded = json.decode(dataString);
-        if (decoded is Map<String, dynamic>) {
-          final m = Map<String, dynamic>.from(decoded);
-          m['history'] = _normalizeHistoryList(
-            m['history'],
-            maxEntries: learningHistoryRetentionCount,
-          );
-          m['latestStatus'] = _deriveLatestStatus(
-            m['history'] as List<Map<String, dynamic>>,
-          );
-          m['lastUpdated'] = _deriveMergedLastUpdated(
-            history: m['history'] as List<Map<String, dynamic>>,
-            localData: m,
-            remoteData: null,
-          );
-          _learningDataCache[problem.id] = m;
-          return Map<String, dynamic>.from(m);
-        }
-      }
-
-      // デフォルトデータ
-      final d = {
-        'problemId': problem.id,
-        'latestStatus': 'none',
-        'history': <Map<String, dynamic>>[],
-        'lastUpdated': DateTime.now().toIso8601String(),
-      };
-      _learningDataCache[problem.id] = d;
-      return Map<String, dynamic>.from(d);
-    } catch (e) {
-      print('Error getting learning data: $e');
-      final d = {
-        'problemId': problem.id,
-        'latestStatus': 'none',
-        'history': <Map<String, dynamic>>[],
-        'lastUpdated': DateTime.now().toIso8601String(),
-      };
-      _learningDataCache[problem.id] = d;
-      return Map<String, dynamic>.from(d);
     }
   }
 
@@ -2486,6 +2282,7 @@ class SimpleDataManager {
         }
       }
 
+      _invalidateLearningCaches();
       print('Cleared $clearedCount account-specific data keys');
       return true;
     } catch (e) {
@@ -2495,7 +2292,7 @@ class SimpleDataManager {
   }
 
   /// アカウント切り替え時のデータ同期処理
-  /// 前のアカウントのローカルデータをクリアし、新しいアカウントのFirestoreデータを取得
+  /// 前のアカウントの pending ローカルデータをクリアし、新しいアカウントへ持ち越さない
   static Future<void> syncOnAccountSwitch() async {
     try {
       final currentUserId = FirebaseAuthService.userId;
@@ -2508,9 +2305,6 @@ class SimpleDataManager {
         await clearAccountSpecificData();
         // 現在のユーザーIDを保存
         await setLastUserId(currentUserId);
-
-        // アカウント切り替え時はクラウドを正とし、旧ローカルはアップロードしない
-        await _syncFromFirestore(pushMergedToFirestore: false);
       });
 
       print('Account switch sync completed');

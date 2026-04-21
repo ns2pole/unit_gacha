@@ -29,7 +29,7 @@ class FirestoreLearningService {
     try {
       final sanitizedDocId = _sanitizeProblemIdForDocId(problemId);
       final recordRef = _getUserLearningRecordsRef(userId).doc(sanitizedDocId);
-      
+
       await recordRef.set({
         'problemId': problemId,
         'latestStatus': data['latestStatus'],
@@ -51,9 +51,9 @@ class FirestoreLearningService {
   }) async {
     try {
       final sanitizedDocId = _sanitizeProblemIdForDocId(problemId);
-      final recordDoc = await _getUserLearningRecordsRef(userId)
-          .doc(sanitizedDocId)
-          .get();
+      final recordDoc = await _getUserLearningRecordsRef(
+        userId,
+      ).doc(sanitizedDocId).get();
 
       if (!recordDoc.exists) {
         return null;
@@ -64,11 +64,7 @@ class FirestoreLearningService {
         return null;
       }
 
-      // Timestampを文字列に変換
-      final lastUpdated = data['lastUpdated'];
-      if (lastUpdated is Timestamp) {
-        data['lastUpdated'] = lastUpdated.toDate().toIso8601String();
-      }
+      _normalizeRecordTimestamps(data);
 
       return data;
     } catch (e) {
@@ -125,7 +121,7 @@ class FirestoreLearningService {
 
       final sanitizedDocId = _sanitizeProblemIdForDocId(problemId);
       final recordRef = _getUserLearningRecordsRef(userId).doc(sanitizedDocId);
-      
+
       await recordRef.set({
         'problemId': problemId,
         'latestStatus': latestStatus,
@@ -146,41 +142,20 @@ class FirestoreLearningService {
   }) async {
     try {
       final snapshot = await _getUserLearningRecordsRef(userId).get();
-      
+
       final Map<String, Map<String, dynamic>> records = {};
-      
+
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>?;
         if (data == null) continue;
-        
-        // Timestampを文字列に変換
-        final lastUpdated = data['lastUpdated'];
-        if (lastUpdated is Timestamp) {
-          data['lastUpdated'] = lastUpdated.toDate().toIso8601String();
-        }
-        
-        // history配列内のtimeフィールドもTimestampから文字列に変換
-        final history = data['history'] as List?;
-        if (history != null) {
-          final convertedHistory = history.map((item) {
-            if (item is Map<String, dynamic>) {
-              final convertedItem = Map<String, dynamic>.from(item);
-              final time = convertedItem['time'];
-              if (time is Timestamp) {
-                convertedItem['time'] = time.toDate().toIso8601String();
-              }
-              return convertedItem;
-            }
-            return item;
-          }).toList();
-          data['history'] = convertedHistory;
-        }
-        
+
+        _normalizeRecordTimestamps(data);
+
         // ドキュメントIDではなく、保存されている元のproblemIdを使用
         final originalProblemId = data['problemId'] as String? ?? doc.id;
         records[originalProblemId] = data;
       }
-      
+
       return records;
     } catch (e) {
       print('Error getting all learning records from Firestore: $e');
@@ -209,9 +184,30 @@ class FirestoreLearningService {
     required String problemId,
   }) {
     final sanitizedDocId = _sanitizeProblemIdForDocId(problemId);
-    return _getUserLearningRecordsRef(userId)
-        .doc(sanitizedDocId)
-        .snapshots();
+    return _getUserLearningRecordsRef(userId).doc(sanitizedDocId).snapshots();
+  }
+
+  static void _normalizeRecordTimestamps(Map<String, dynamic> data) {
+    final lastUpdated = data['lastUpdated'];
+    if (lastUpdated is Timestamp) {
+      data['lastUpdated'] = lastUpdated.toDate().toIso8601String();
+    }
+
+    final history = data['history'] as List?;
+    if (history == null) return;
+
+    data['history'] = history.map((item) {
+      if (item is! Map) return item;
+      final convertedItem = Map<String, dynamic>.from(item);
+      final time = convertedItem['time'];
+      if (time is Timestamp) {
+        convertedItem['time'] = time.toDate().toIso8601String();
+      }
+      final updatedAt = convertedItem['updatedAt'];
+      if (updatedAt is Timestamp) {
+        convertedItem['updatedAt'] = updatedAt.toDate().toIso8601String();
+      }
+      return convertedItem;
+    }).toList();
   }
 }
-

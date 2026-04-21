@@ -1,7 +1,6 @@
 // lib/pages/gacha/auth/auth_sync.dart
 // 単位ガチャページの認証・同期関連
 
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../services/auth/firebase_auth_service.dart';
 import '../../../services/auth/firestore_public_profile_service.dart';
@@ -12,7 +11,7 @@ import '../../other/auth_page.dart';
 /// Firebaseクラウドデータとの同期ボタン
 class UnitGachaSyncButton extends StatefulWidget {
   final bool enabled;
-  
+
   const UnitGachaSyncButton({Key? key, this.enabled = true}) : super(key: key);
 
   @override
@@ -24,7 +23,7 @@ class _UnitGachaSyncButtonState extends State<UnitGachaSyncButton> {
 
   Future<void> _performSync() async {
     if (_isSyncing) return;
-    
+
     setState(() => _isSyncing = true);
 
     try {
@@ -33,13 +32,7 @@ class _UnitGachaSyncButtonState extends State<UnitGachaSyncButton> {
         SimpleDataManager.syncLocalDataToFirestore(),
         SimpleDataManager.syncLocalSettingsToFirestore(),
       ], eagerError: false);
-      
-      try {
-        await SimpleDataManager.initialize();
-      } catch (e) {
-        print('Warning: Error initializing from Firestore: $e');
-      }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -57,7 +50,7 @@ class _UnitGachaSyncButtonState extends State<UnitGachaSyncButton> {
         final message = errorStr.contains('permission')
             ? l10n.cloudSyncPermissionDenied
             : l10n.cloudSyncPartialError;
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message),
@@ -78,7 +71,7 @@ class _UnitGachaSyncButtonState extends State<UnitGachaSyncButton> {
     final isEnabled = widget.enabled && !_isSyncing;
     final iconColor = isEnabled ? Color(0xFF8B7355) : Colors.grey.shade400;
     final l10n = AppLocalizations.of(context);
-    
+
     return Material(
       color: Colors.transparent,
       child: IconButton(
@@ -93,7 +86,9 @@ class _UnitGachaSyncButtonState extends State<UnitGachaSyncButton> {
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B7355)),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Color(0xFF8B7355),
+                      ),
                     ),
                   )
                 : Icon(Icons.cloud_sync, color: iconColor, size: 42.0);
@@ -120,7 +115,7 @@ class UnitGachaAuthCloudButtons extends StatelessWidget {
         final isAuthenticated = FirebaseAuthService.isAuthenticated;
         final accountInfo = _getAccountInfo();
         final loginMethod = FirebaseAuthService.loginMethod;
-        
+
         if (isAuthenticated) {
           return Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -143,7 +138,7 @@ class UnitGachaAuthCloudButtons extends StatelessWidget {
     final userPhoneNumber = FirebaseAuthService.userPhoneNumber;
     final userEmail = FirebaseAuthService.userEmail;
     final displayName = FirebaseAuthService.displayName;
-    
+
     if (userPhoneNumber != null && userPhoneNumber.isNotEmpty) {
       return userPhoneNumber;
     } else if (userEmail != null && userEmail.isNotEmpty) {
@@ -213,7 +208,10 @@ Widget buildCloudMenuButton(
         final uid = FirebaseAuthService.userId;
         if (uid != null) {
           try {
-            await FirestorePublicProfileService.setUnitGachaParticipating(userId: uid, participating: false);
+            await FirestorePublicProfileService.setUnitGachaParticipating(
+              userId: uid,
+              participating: false,
+            );
           } catch (_) {}
         }
 
@@ -289,13 +287,7 @@ Future<void> _performSync(BuildContext context) async {
       SimpleDataManager.syncLocalDataToFirestore(),
       SimpleDataManager.syncLocalSettingsToFirestore(),
     ], eagerError: false);
-    
-    try {
-      await SimpleDataManager.initialize();
-    } catch (e) {
-      print('Warning: Error initializing from Firestore: $e');
-    }
-    
+
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -312,7 +304,7 @@ Future<void> _performSync(BuildContext context) async {
       final message = errorStr.contains('permission')
           ? l10n.cloudSyncPermissionDenied
           : l10n.cloudSyncPartialError;
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
@@ -345,8 +337,3 @@ Widget buildLoginButton(BuildContext context) {
     ),
   );
 }
-
-
-
-
-

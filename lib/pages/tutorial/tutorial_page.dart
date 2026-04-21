@@ -262,7 +262,7 @@ class _TutorialPageState extends State<TutorialPage> {
       );
       if (success) {
         debugPrint(
-          'チュートリアル履歴保存成功: problemId=${_tutorialMathProblem.id}, status=$status, time=$t',
+          'チュートリアル履歴保存成功: problemId=${_tutorialMathProblem.id}, status=$status',
         );
       } else {
         debugPrint('警告: チュートリアル履歴保存が失敗しました');
