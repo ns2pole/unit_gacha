@@ -93,9 +93,6 @@ class SimpleDataManager {
   static const String _purchaseRecommendShownElectromagnetismKey =
       '$_namespace/purchase_recommend_shown_electromagnetism_v1';
 
-  static bool _isRecommendCategory(UnitCategory c) =>
-      c == UnitCategory.mechanics || c == UnitCategory.electromagnetism;
-
   static String? _attemptCountKeyFor(UnitCategory c) {
     switch (c) {
       case UnitCategory.mechanics:
@@ -221,6 +218,9 @@ class SimpleDataManager {
   static final Map<String, List<Map<String, dynamic>>> _learningHistoryCache =
       {};
   static final Map<String, Map<String, dynamic>> _learningDataCache = {};
+  static final Map<String, Map<String, dynamic>> _gachaSettingsCache = {};
+  static Map<String, dynamic>? _userSettingsCache;
+  static final Map<String, dynamic> _otherSettingsCache = {};
   static List<Map<String, dynamic>>? _unitGachaAttemptQueueCache;
   static UnitGachaAttemptSyncResult? _lastUnitGachaAttemptSyncResult;
 
@@ -247,11 +247,40 @@ class SimpleDataManager {
     if (notify) _notifyLearningDataChanged();
   }
 
+  static void _invalidateSettingsCaches({
+    String? gachaType,
+    String? otherSettingKey,
+  }) {
+    if (gachaType != null) {
+      _gachaSettingsCache.remove(gachaType);
+    } else {
+      _gachaSettingsCache.clear();
+    }
+    if (otherSettingKey != null) {
+      _otherSettingsCache.remove(otherSettingKey);
+    } else {
+      _otherSettingsCache.clear();
+    }
+    if (gachaType == null && otherSettingKey == null) {
+      _userSettingsCache = null;
+    }
+  }
+
   static String _pendingLearningOpsKey(String problemId) =>
       '$_namespace/learning_pending_ops/$problemId';
+  static String _pendingSettingsKey(String scope) =>
+      '$_namespace/settings_pending/$scope';
+  static String _pendingGachaSettingsScope(String gachaType) =>
+      'gacha/${Uri.encodeComponent(gachaType)}';
+  static const String _pendingUserSettingsScope = 'user_settings';
+  static String _pendingOtherSettingScope(String key) =>
+      'other/${Uri.encodeComponent(key)}';
 
   static String _legacyLearningKey(String problemId) =>
       '$_namespace/learning/$problemId';
+  static String _legacyGachaSettingsKey(String gachaType) =>
+      '$_namespace/gacha/$gachaType';
+  static const String _legacyUserSettingsKey = '$_namespace/user_settings';
 
   static DateTime? _tryParseDateTime(dynamic value) {
     if (value == null) return null;
@@ -638,6 +667,488 @@ class SimpleDataManager {
     return true;
   }
 
+  static dynamic _cloneJsonValue(dynamic value) {
+    if (value == null) return null;
+    try {
+      return json.decode(json.encode(value));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static List<String> _normalizeStringList(
+    dynamic raw, {
+    int? maxLength,
+  }) {
+    List<String> out = const [];
+    if (raw is List) {
+      out = raw.whereType<String>().toList();
+    } else if (raw is String && raw.isNotEmpty) {
+      try {
+        final decoded = json.decode(raw);
+        if (decoded is List) {
+          out = decoded.whereType<String>().toList();
+        }
+      } catch (_) {}
+    }
+    if (maxLength != null && out.length > maxLength) {
+      return out.take(maxLength).toList();
+    }
+    return out;
+  }
+
+  static Map<String, dynamic>? _buildPendingSettingReplaceOperation(
+    dynamic value, {
+    String? updatedAt,
+  }) {
+    final normalizedValue = _cloneJsonValue(value);
+    if (normalizedValue == null) return null;
+    return {
+      'kind': 'replace',
+      'updatedAt':
+          _tryParseDateTime(updatedAt)?.toIso8601String() ??
+          DateTime.now().toIso8601String(),
+      'value': normalizedValue,
+    };
+  }
+
+  static Map<String, dynamic>? _normalizePendingSettingOperation(dynamic raw) {
+    if (raw is! Map) return null;
+    final kind = raw['kind'] as String?;
+    final updatedAt =
+        _tryParseDateTime(raw['updatedAt'])?.toIso8601String() ??
+        DateTime.now().toIso8601String();
+    switch (kind) {
+      case 'replace':
+        final value = _cloneJsonValue(raw['value']);
+        if (value == null) return null;
+        return {'kind': 'replace', 'updatedAt': updatedAt, 'value': value};
+      case 'clear':
+        return {'kind': 'clear', 'updatedAt': updatedAt};
+      default:
+        return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> _loadPendingSettingOperation(
+    SharedPreferences prefs,
+    String scope, {
+    required Future<Map<String, dynamic>?> Function() loadLegacy,
+  }) async {
+    final raw = prefs.getString(_pendingSettingsKey(scope));
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = json.decode(raw);
+        final normalized = _normalizePendingSettingOperation(decoded);
+        if (normalized != null) return normalized;
+      } catch (_) {}
+    }
+
+    final migrated = await loadLegacy();
+    if (migrated != null) {
+      final normalized = _normalizePendingSettingOperation(migrated);
+      if (normalized != null) {
+        await prefs.setString(
+          _pendingSettingsKey(scope),
+          json.encode(normalized),
+        );
+        return normalized;
+      }
+    }
+    return null;
+  }
+
+  static Future<void> _savePendingSettingOperation(
+    SharedPreferences prefs,
+    String scope,
+    Map<String, dynamic>? operation, {
+    required void Function() invalidateCache,
+  }) async {
+    final normalized = operation == null
+        ? null
+        : _normalizePendingSettingOperation(operation);
+    if (normalized == null) {
+      await prefs.remove(_pendingSettingsKey(scope));
+    } else {
+      await prefs.setString(_pendingSettingsKey(scope), json.encode(normalized));
+    }
+    invalidateCache();
+  }
+
+  static dynamic _applyPendingSettingOperation(
+    dynamic baseValue,
+    Map<String, dynamic>? operation,
+  ) {
+    final clonedBase = _cloneJsonValue(baseValue);
+    if (operation == null) return clonedBase;
+    switch (operation['kind']) {
+      case 'replace':
+        return _cloneJsonValue(operation['value']);
+      case 'clear':
+        return null;
+      default:
+        return clonedBase;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> _loadLegacyGachaSettingsOperation(
+    SharedPreferences prefs,
+    String gachaType,
+  ) async {
+    final raw = prefs.getString(_legacyGachaSettingsKey(gachaType));
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = json.decode(raw);
+      if (decoded is Map) {
+        final settings = _getDefaultGachaSettings()
+          ..addAll(Map<String, dynamic>.from(decoded));
+        final op = _buildPendingSettingReplaceOperation(
+          settings,
+          updatedAt: settings['lastUpdated'] as String?,
+        );
+        await prefs.remove(_legacyGachaSettingsKey(gachaType));
+        return op;
+      }
+    } catch (_) {}
+    await prefs.remove(_legacyGachaSettingsKey(gachaType));
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> _loadLegacyUserSettingsOperation(
+    SharedPreferences prefs,
+  ) async {
+    final raw = prefs.getString(_legacyUserSettingsKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = json.decode(raw);
+      if (decoded is Map) {
+        final settings = Map<String, dynamic>.from(decoded);
+        final op = _buildPendingSettingReplaceOperation(
+          settings,
+          updatedAt: settings['lastUpdated'] as String?,
+        );
+        await prefs.remove(_legacyUserSettingsKey);
+        return op;
+      }
+    } catch (_) {}
+    await prefs.remove(_legacyUserSettingsKey);
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> _loadLegacyOtherSettingOperation(
+    SharedPreferences prefs,
+    String key, {
+    dynamic Function(dynamic raw)? legacyDecoder,
+  }) async {
+    if (!prefs.containsKey(key)) return null;
+    final raw = prefs.get(key);
+    final value = legacyDecoder != null ? legacyDecoder(raw) : raw;
+    await prefs.remove(key);
+    return _buildPendingSettingReplaceOperation(value);
+  }
+
+  static Future<Map<String, dynamic>?> _fetchCloudGachaSettings(
+    String userId,
+    String gachaType,
+  ) async {
+    final remote = await FirestoreSettingsService.getGachaSettings(
+      userId: userId,
+      gachaType: gachaType,
+    );
+    if (remote == null) return null;
+    final merged = _getDefaultGachaSettings()..addAll(remote);
+    return merged;
+  }
+
+  static Future<Map<String, dynamic>> _resolveDisplayGachaSettings(
+    String gachaType,
+  ) async {
+    final canUseCache = !FirebaseAuthService.isAuthenticated;
+    final cached = _gachaSettingsCache[gachaType];
+    if (canUseCache && cached != null) {
+      return Map<String, dynamic>.from(cached);
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final pending = await _loadPendingSettingOperation(
+      prefs,
+      _pendingGachaSettingsScope(gachaType),
+      loadLegacy: () => _loadLegacyGachaSettingsOperation(prefs, gachaType),
+    );
+
+    Map<String, dynamic>? cloudData;
+    final userId = FirebaseAuthService.userId;
+    if (FirebaseAuthService.isAuthenticated && userId != null) {
+      try {
+        cloudData = await _fetchCloudGachaSettings(userId, gachaType);
+      } catch (_) {
+        cloudData = null;
+      }
+    }
+
+    final resolvedRaw = _applyPendingSettingOperation(
+      cloudData ?? _getDefaultGachaSettings(),
+      pending,
+    );
+    final resolved = _getDefaultGachaSettings();
+    if (resolvedRaw is Map) {
+      resolved.addAll(Map<String, dynamic>.from(resolvedRaw));
+    }
+    if (canUseCache) {
+      _gachaSettingsCache[gachaType] = Map<String, dynamic>.from(resolved);
+    }
+    return Map<String, dynamic>.from(resolved);
+  }
+
+  static Future<Map<String, dynamic>> _resolveDisplayUserSettings() async {
+    final canUseCache = !FirebaseAuthService.isAuthenticated;
+    if (canUseCache && _userSettingsCache != null) {
+      return Map<String, dynamic>.from(_userSettingsCache!);
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final pending = await _loadPendingSettingOperation(
+      prefs,
+      _pendingUserSettingsScope,
+      loadLegacy: () => _loadLegacyUserSettingsOperation(prefs),
+    );
+
+    Map<String, dynamic>? cloudData;
+    final userId = FirebaseAuthService.userId;
+    if (FirebaseAuthService.isAuthenticated && userId != null) {
+      try {
+        cloudData = await FirestoreSettingsService.getUserSettings(userId: userId);
+      } catch (_) {
+        cloudData = null;
+      }
+    }
+
+    final resolvedRaw = _applyPendingSettingOperation(cloudData ?? const {}, pending);
+    final resolved = resolvedRaw is Map
+        ? Map<String, dynamic>.from(resolvedRaw)
+        : <String, dynamic>{};
+    if (canUseCache) {
+      _userSettingsCache = Map<String, dynamic>.from(resolved);
+    }
+    return Map<String, dynamic>.from(resolved);
+  }
+
+  static Future<dynamic> getOtherSettingValue(
+    String key, {
+    dynamic Function(dynamic raw)? legacyDecoder,
+  }) async {
+    final canUseCache = !FirebaseAuthService.isAuthenticated;
+    if (canUseCache && _otherSettingsCache.containsKey(key)) {
+      return _cloneJsonValue(_otherSettingsCache[key]);
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final pending = await _loadPendingSettingOperation(
+      prefs,
+      _pendingOtherSettingScope(key),
+      loadLegacy: () => _loadLegacyOtherSettingOperation(
+        prefs,
+        key,
+        legacyDecoder: legacyDecoder,
+      ),
+    );
+
+    dynamic cloudValue;
+    final userId = FirebaseAuthService.userId;
+    if (FirebaseAuthService.isAuthenticated && userId != null) {
+      try {
+        cloudValue = await FirestoreSettingsService.getOtherSetting(
+          userId: userId,
+          key: key,
+        );
+      } catch (_) {
+        cloudValue = null;
+      }
+    }
+
+    final resolved = _applyPendingSettingOperation(cloudValue, pending);
+    if (canUseCache) {
+      _otherSettingsCache[key] = _cloneJsonValue(resolved);
+    }
+    return _cloneJsonValue(resolved);
+  }
+
+  static Future<bool> _syncPendingGachaSettings(
+    SharedPreferences prefs,
+    String userId,
+    String gachaType,
+  ) async {
+    final pending = await _loadPendingSettingOperation(
+      prefs,
+      _pendingGachaSettingsScope(gachaType),
+      loadLegacy: () => _loadLegacyGachaSettingsOperation(prefs, gachaType),
+    );
+    if (pending == null) return false;
+
+    final resolvedRaw = _applyPendingSettingOperation(
+      _getDefaultGachaSettings(),
+      pending,
+    );
+    final settings = _getDefaultGachaSettings();
+    if (resolvedRaw is Map) {
+      settings.addAll(Map<String, dynamic>.from(resolvedRaw));
+    }
+    final success = await FirestoreSettingsService.saveGachaSettings(
+      userId: userId,
+      gachaType: gachaType,
+      settings: settings,
+    );
+    if (!success) return false;
+
+    await _savePendingSettingOperation(
+      prefs,
+      _pendingGachaSettingsScope(gachaType),
+      null,
+      invalidateCache: () => _invalidateSettingsCaches(gachaType: gachaType),
+    );
+    _gachaSettingsCache[gachaType] = Map<String, dynamic>.from(settings);
+    return true;
+  }
+
+  static Future<bool> _syncPendingUserSettings(
+    SharedPreferences prefs,
+    String userId,
+  ) async {
+    final pending = await _loadPendingSettingOperation(
+      prefs,
+      _pendingUserSettingsScope,
+      loadLegacy: () => _loadLegacyUserSettingsOperation(prefs),
+    );
+    if (pending == null) return false;
+
+    final resolvedRaw = _applyPendingSettingOperation(const {}, pending);
+    final settings = resolvedRaw is Map
+        ? Map<String, dynamic>.from(resolvedRaw)
+        : <String, dynamic>{};
+    final success = await FirestoreSettingsService.saveUserSettings(
+      userId: userId,
+      settings: settings,
+    );
+    if (!success) return false;
+
+    await _savePendingSettingOperation(
+      prefs,
+      _pendingUserSettingsScope,
+      null,
+      invalidateCache: _invalidateSettingsCaches,
+    );
+    _userSettingsCache = Map<String, dynamic>.from(settings);
+    return true;
+  }
+
+  static Future<bool> _syncPendingOtherSetting(
+    SharedPreferences prefs,
+    String userId,
+    String key, {
+    dynamic Function(dynamic raw)? legacyDecoder,
+  }) async {
+    final pending = await _loadPendingSettingOperation(
+      prefs,
+      _pendingOtherSettingScope(key),
+      loadLegacy: () => _loadLegacyOtherSettingOperation(
+        prefs,
+        key,
+        legacyDecoder: legacyDecoder,
+      ),
+    );
+    if (pending == null) return false;
+
+    final value = _applyPendingSettingOperation(null, pending);
+    final success = await FirestoreSettingsService.saveOtherSetting(
+      userId: userId,
+      key: key,
+      value: value,
+    );
+    if (!success) return false;
+
+    await _savePendingSettingOperation(
+      prefs,
+      _pendingOtherSettingScope(key),
+      null,
+      invalidateCache: () => _invalidateSettingsCaches(otherSettingKey: key),
+    );
+    _otherSettingsCache[key] = _cloneJsonValue(value);
+    return true;
+  }
+
+  static List<String>? _decodeSelectedFreeGachasLegacyValue(dynamic raw) {
+    final out = _normalizeStringList(raw, maxLength: 2);
+    return out.isEmpty ? null : out;
+  }
+
+  static Future<void> _migrateLegacySettingsToPending(
+    SharedPreferences prefs,
+  ) async {
+    final allKeys = prefs.getKeys();
+
+    final gachaTypes = allKeys
+        .where(
+          (key) =>
+              key.startsWith('$_namespace/gacha/') &&
+              key != '$_namespace/gacha',
+        )
+        .map((key) => key.replaceFirst('$_namespace/gacha/', ''))
+        .toList();
+    for (final gachaType in gachaTypes) {
+      await _loadPendingSettingOperation(
+        prefs,
+        _pendingGachaSettingsScope(gachaType),
+        loadLegacy: () => _loadLegacyGachaSettingsOperation(prefs, gachaType),
+      );
+    }
+
+    await _loadPendingSettingOperation(
+      prefs,
+      _pendingUserSettingsScope,
+      loadLegacy: () => _loadLegacyUserSettingsOperation(prefs),
+    );
+
+    final otherKeys = <String>{
+      'integral_gacha_exclusion_mode',
+      'limit_gacha_exclusion_mode',
+      'sequence_gacha_exclusion_mode',
+      'unit_gacha_exclusion_mode',
+      'integral_gacha_max_selections',
+      'limit_gacha_max_selections',
+      'sequence_gacha_max_selections',
+      'unit_gacha_max_selections',
+      'unit_gacha_selected_categories',
+      'unit_reference_table_selected_category',
+      _selectedFreeGachasKey,
+      ...allKeys.where(
+        (key) =>
+            key.endsWith('_aggregation_mode_v1') &&
+            ![
+              'unit',
+              'integral',
+              'limit',
+              'sequence',
+              'congruence',
+            ].any((type) => key.startsWith('${type}_aggregation_mode_v1')),
+      ),
+    };
+
+    for (final key in otherKeys) {
+      final legacyDecoder = key == _selectedFreeGachasKey
+          ? _decodeSelectedFreeGachasLegacyValue
+          : null;
+      await _loadPendingSettingOperation(
+        prefs,
+        _pendingOtherSettingScope(key),
+        loadLegacy: () => _loadLegacyOtherSettingOperation(
+          prefs,
+          key,
+          legacyDecoder: legacyDecoder,
+        ),
+      );
+    }
+  }
+
   // ============================================================================
   // 初期化とバージョン管理
   // ============================================================================
@@ -659,7 +1170,10 @@ class SimpleDataManager {
 
       // 認証済みユーザーの場合、未同期データがあればクラウドへ反映する
       if (FirebaseAuthService.isAuthenticated) {
-        await syncLocalDataToFirestore();
+        await Future.wait([
+          syncLocalDataToFirestore(),
+          syncLocalSettingsToFirestore(),
+        ]);
       }
 
       return true;
@@ -934,251 +1448,6 @@ class SimpleDataManager {
     } catch (_) {}
   }
 
-  /// Firestoreから設定を同期（内部メソッド）
-  static Future<void> _syncSettingsFromFirestore(String userId) async {
-    try {
-      // 認証状態を確認
-      final isAuthenticated = FirebaseAuthService.isAuthenticated;
-      final currentUserId = FirebaseAuthService.userId;
-
-      if (!isAuthenticated) {
-        print('⚠️ Firestore設定同期をスキップ: ユーザーが認証されていません');
-        return;
-      }
-
-      if (currentUserId != userId) {
-        print(
-          '⚠️ Firestore設定同期をスキップ: ユーザーIDが一致しません (リクエスト: $userId, 現在: $currentUserId)',
-        );
-        return;
-      }
-
-      final prefs = await SharedPreferences.getInstance();
-
-      AppLogger.subsection('設定の同期開始', showNumber: false);
-      AppLogger.info('Firestoreから設定を同期中', details: 'ユーザーID: $userId');
-
-      // 全設定を取得（タイムアウト付き）
-      Map<String, dynamic> allSettings;
-      try {
-        allSettings =
-            await FirestoreSettingsService.getAllSettings(
-              userId: userId,
-            ).timeout(
-              const Duration(seconds: 10),
-              onTimeout: () {
-                AppLogger.warning(
-                  '設定の同期がタイムアウトしました',
-                  details: '10秒以内に完了しませんでした',
-                );
-                return <String, dynamic>{};
-              },
-            );
-      } catch (e) {
-        final errorStr = e.toString().toLowerCase();
-        if (errorStr.contains('permission') ||
-            errorStr.contains('permission-denied')) {
-          AppLogger.warning(
-            '設定の同期が権限エラーで失敗しました',
-            details:
-                'Firestoreセキュリティルールを確認してください。FIRESTORE_SECURITY_RULES.mdを参照してください。',
-          );
-          return; // 権限エラーの場合は早期に処理を停止
-        }
-        AppLogger.error('設定の取得に失敗しました', error: e);
-        allSettings = {};
-      }
-
-      // 権限エラーが発生した場合は早期に処理を停止
-      if (allSettings.isEmpty) {
-        AppLogger.warning('設定の同期をスキップしました', details: '空の設定が返されました（権限エラーの可能性）');
-        return;
-      }
-
-      // ガチャ設定を同期
-      final gachaSettings =
-          allSettings['gacha_settings'] as Map<String, Map<String, dynamic>>?;
-      if (gachaSettings != null) {
-        for (final entry in gachaSettings.entries) {
-          final gachaType = entry.key;
-          final firestoreSettings = entry.value;
-
-          final localKey = '$_namespace/gacha/$gachaType';
-          final localDataString = prefs.getString(localKey);
-
-          Map<String, dynamic> mergedSettings;
-
-          if (localDataString != null) {
-            final localSettings =
-                json.decode(localDataString) as Map<String, dynamic>;
-
-            // タイムスタンプを比較して新しい方を優先
-            final firestoreTime = firestoreSettings['lastUpdated'] as String?;
-            final localTime = localSettings['lastUpdated'] as String?;
-
-            if (firestoreTime != null && localTime != null) {
-              try {
-                final firestoreDateTime = DateTime.parse(firestoreTime);
-                final localDateTime = DateTime.parse(localTime);
-
-                if (firestoreDateTime.isAfter(localDateTime)) {
-                  mergedSettings = firestoreSettings;
-                } else {
-                  mergedSettings = localSettings;
-                }
-              } catch (e) {
-                // パースエラー時はパースに成功した方を採用
-                DateTime? firestoreDateTime;
-                DateTime? localDateTime;
-
-                try {
-                  firestoreDateTime = DateTime.parse(firestoreTime);
-                } catch (e) {
-                  // Firestoreのパース失敗
-                }
-
-                try {
-                  localDateTime = DateTime.parse(localTime);
-                } catch (e) {
-                  // ローカルのパース失敗
-                }
-
-                if (firestoreDateTime != null && localDateTime != null) {
-                  // 両方成功した場合は比較（通常はここには来ない）
-                  mergedSettings = firestoreDateTime.isAfter(localDateTime)
-                      ? firestoreSettings
-                      : localSettings;
-                } else if (firestoreDateTime != null) {
-                  // Firestoreのみ成功
-                  mergedSettings = firestoreSettings;
-                } else if (localDateTime != null) {
-                  // ローカルのみ成功
-                  mergedSettings = localSettings;
-                } else {
-                  // 両方失敗した場合はFirestoreを優先（新しい物を採用の方針）
-                  mergedSettings = firestoreSettings;
-                }
-              }
-            } else if (firestoreTime != null) {
-              mergedSettings = firestoreSettings;
-            } else {
-              mergedSettings = localSettings;
-            }
-          } else {
-            mergedSettings = firestoreSettings;
-          }
-
-          // マージした設定をローカルに保存
-          await prefs.setString(localKey, json.encode(mergedSettings));
-        }
-      }
-
-      // ユーザー設定を同期
-      final userSettings =
-          allSettings['user_settings'] as Map<String, dynamic>?;
-      if (userSettings != null) {
-        final localKey = '$_namespace/user_settings';
-        final localDataString = prefs.getString(localKey);
-
-        Map<String, dynamic> mergedSettings;
-
-        if (localDataString != null) {
-          final localSettings =
-              json.decode(localDataString) as Map<String, dynamic>;
-
-          // タイムスタンプを比較して新しい方を優先
-          final firestoreTime = userSettings['lastUpdated'] as String?;
-          final localTime = localSettings['lastUpdated'] as String?;
-
-          if (firestoreTime != null && localTime != null) {
-            try {
-              final firestoreDateTime = DateTime.parse(firestoreTime);
-              final localDateTime = DateTime.parse(localTime);
-
-              if (firestoreDateTime.isAfter(localDateTime)) {
-                mergedSettings = userSettings;
-              } else {
-                mergedSettings = localSettings;
-              }
-            } catch (e) {
-              // パースエラー時はパースに成功した方を採用
-              DateTime? firestoreDateTime;
-              DateTime? localDateTime;
-
-              try {
-                firestoreDateTime = DateTime.parse(firestoreTime);
-              } catch (e) {
-                // Firestoreのパース失敗
-              }
-
-              try {
-                localDateTime = DateTime.parse(localTime);
-              } catch (e) {
-                // ローカルのパース失敗
-              }
-
-              if (firestoreDateTime != null && localDateTime != null) {
-                // 両方成功した場合は比較（通常はここには来ない）
-                mergedSettings = firestoreDateTime.isAfter(localDateTime)
-                    ? userSettings
-                    : localSettings;
-              } else if (firestoreDateTime != null) {
-                // Firestoreのみ成功
-                mergedSettings = userSettings;
-              } else if (localDateTime != null) {
-                // ローカルのみ成功
-                mergedSettings = localSettings;
-              } else {
-                // 両方失敗した場合はFirestoreを優先（新しい物を採用の方針）
-                mergedSettings = userSettings;
-              }
-            }
-          } else if (firestoreTime != null) {
-            mergedSettings = userSettings;
-          } else {
-            mergedSettings = localSettings;
-          }
-        } else {
-          mergedSettings = userSettings;
-        }
-
-        // マージした設定をローカルに保存
-        await prefs.setString(localKey, json.encode(mergedSettings));
-      }
-
-      // 注意: Pro購入情報はFirebaseから取得しない（RevenueCatで管理）
-      // 有料オプション購入状態の同期は削除
-
-      // その他の設定を同期
-      final otherSettings =
-          allSettings['other_settings'] as Map<String, dynamic>?;
-      if (otherSettings != null) {
-        for (final entry in otherSettings.entries) {
-          final key = entry.key;
-          final value = entry.value;
-
-          // 既存のローカル値を確認（タイムスタンプ比較は簡略化）
-          if (value != null) {
-            if (value is int) {
-              await prefs.setInt(key, value);
-            } else if (value is String) {
-              await prefs.setString(key, value);
-            } else if (value is bool) {
-              await prefs.setBool(key, value);
-            } else if (value is double) {
-              await prefs.setDouble(key, value);
-            }
-          }
-        }
-      }
-
-      AppLogger.success('Firestoreからの設定同期が完了しました');
-    } catch (e) {
-      print('Error syncing settings from Firestore for user: $userId - $e');
-      // エラー時も処理を継続
-    }
-  }
-
   /// ローカル設定をFirestoreに同期（認証時に呼び出す）
   static Future<void> syncLocalSettingsToFirestore() async {
     try {
@@ -1193,223 +1462,53 @@ class SimpleDataManager {
         return;
       }
       await _withCloudSyncIndicator(() async {
-        print('Starting local settings sync to Firestore for user: $userId');
+        print('Starting pending settings sync to Firestore for user: $userId');
 
         final prefs = await SharedPreferences.getInstance();
-        final allKeys = prefs.getKeys();
+        await _migrateLegacySettingsToPending(prefs);
 
-        // ガチャ設定を同期
-        final gachaKeys = allKeys
-            .where(
-              (key) =>
-                  key.startsWith('$_namespace/gacha/') &&
-                  key != '$_namespace/gacha',
+        final pendingScopes = prefs
+            .getKeys()
+            .where((key) => key.startsWith('$_namespace/settings_pending/'))
+            .map(
+              (key) => key.replaceFirst('$_namespace/settings_pending/', ''),
             )
-            .toList();
+            .toList()
+          ..sort();
 
-        // パーミッションエラーを検出するためのフラグ
-        bool hasPermissionError = false;
-
-        for (final key in gachaKeys) {
-          final dataString = prefs.getString(key);
-          if (dataString == null) continue;
-
+        for (final scope in pendingScopes) {
           try {
-            final data = json.decode(dataString) as Map<String, dynamic>;
-            final gachaType = key.replaceFirst('$_namespace/gacha/', '');
-
-            // パーミッションエラーが既に発生している場合はスキップ
-            if (hasPermissionError) {
+            if (scope.startsWith('gacha/')) {
+              final gachaType = Uri.decodeComponent(
+                scope.replaceFirst('gacha/', ''),
+              );
+              await _syncPendingGachaSettings(prefs, userId, gachaType);
               continue;
             }
-
-            // ローカルデータを直接Firestoreに書き込む（読み取りをスキップして高速化）
-            final success = await FirestoreSettingsService.saveGachaSettings(
-              userId: userId,
-              gachaType: gachaType,
-              settings: data,
-            );
-
-            if (success) {
-              print('Synced gacha settings for $gachaType to Firestore');
-            } else {
-              // 失敗した場合はパーミッションエラーの可能性があるが、次の項目も試す
-              print('Warning: Failed to sync gacha settings for $gachaType');
+            if (scope == _pendingUserSettingsScope) {
+              await _syncPendingUserSettings(prefs, userId);
+              continue;
+            }
+            if (scope.startsWith('other/')) {
+              final key = Uri.decodeComponent(
+                scope.replaceFirst('other/', ''),
+              );
+              final legacyDecoder = key == _selectedFreeGachasKey
+                  ? _decodeSelectedFreeGachasLegacyValue
+                  : null;
+              await _syncPendingOtherSetting(
+                prefs,
+                userId,
+                key,
+                legacyDecoder: legacyDecoder,
+              );
             }
           } catch (e) {
-            final errorStr = e.toString().toLowerCase();
-            if (errorStr.contains('permission')) {
-              hasPermissionError = true;
-              print(
-                'Permission error detected, skipping remaining Firestore operations',
-              );
-              break;
-            }
-            print('Error syncing gacha settings $key to Firestore: $e');
-            // 個別のエラーは無視して続行
+            print('Error syncing pending setting scope $scope: $e');
           }
         }
 
-        // ユーザー設定を同期（パーミッションエラーが発生していない場合のみ）
-        if (!hasPermissionError) {
-          final userSettingsKey = '$_namespace/user_settings';
-          final userSettingsString = prefs.getString(userSettingsKey);
-          if (userSettingsString != null) {
-            try {
-              final userSettings =
-                  json.decode(userSettingsString) as Map<String, dynamic>;
-
-              final success = await FirestoreSettingsService.saveUserSettings(
-                userId: userId,
-                settings: userSettings,
-              );
-
-              if (success) {
-                print('Synced user settings to Firestore');
-              } else {
-                print('Warning: Failed to sync user settings to Firestore');
-              }
-            } catch (e) {
-              final errorStr = e.toString().toLowerCase();
-              if (errorStr.contains('permission')) {
-                hasPermissionError = true;
-                print(
-                  'Permission error detected, skipping remaining Firestore operations',
-                );
-              } else {
-                print('Error syncing user settings to Firestore: $e');
-              }
-            }
-          }
-        }
-
-        // 注意: Pro購入情報はFirebaseにバックアップしない（RevenueCatで管理）
-        // 有料オプション購入状態の同期は削除
-
-        // その他の設定を同期（パーミッションエラーが発生していない場合のみ）
-        // 注意: 集計設定（aggregation_mode）はガチャ設定の中に含まれるため、個別の同期は不要
-        if (!hasPermissionError) {
-          final otherSettingKeys = [
-            'integral_gacha_exclusion_mode',
-            'limit_gacha_exclusion_mode',
-            'sequence_gacha_exclusion_mode',
-            'unit_gacha_exclusion_mode',
-            // 集計設定はガチャ設定の中に含まれるため削除:
-            // 'integral_gacha_aggregation_mode',
-            // 'limit_gacha_aggregation_mode',
-            // 'sequence_gacha_aggregation_mode',
-            // 'unit_gacha_aggregation_mode',
-            'integral_gacha_max_selections',
-            'limit_gacha_max_selections',
-            'sequence_gacha_max_selections',
-            'unit_gacha_max_selections',
-            'unit_gacha_selected_categories',
-            _selectedFreeGachasKey, // 選択された無料ガチャのリスト
-          ];
-
-          // デバッグ用: 選択された無料ガチャのキーが含まれていることを確認
-          print(
-            'Syncing other settings, including selected free gachas key: $_selectedFreeGachasKey',
-          );
-
-          // ガチャタイプでない問題一覧ページの集計設定キー（*_aggregation_mode_v1）を動的に検出
-          // ガチャタイプの集計設定はガチャ設定として既に同期されている
-          final aggregationModeKeys = allKeys
-              .where(
-                (key) =>
-                    key.endsWith('_aggregation_mode_v1') &&
-                    ![
-                      'unit',
-                      'integral',
-                      'limit',
-                      'sequence',
-                      'congruence',
-                    ].any(
-                      (type) => key.startsWith('${type}_aggregation_mode_v1'),
-                    ),
-              )
-              .toList();
-
-          // すべての設定キーを結合
-          final allOtherSettingKeys = [
-            ...otherSettingKeys,
-            ...aggregationModeKeys,
-          ];
-
-          for (final settingKey in allOtherSettingKeys) {
-            final value = prefs.get(settingKey);
-            if (value != null) {
-              try {
-                // _selectedFreeGachasKeyの場合はJSON文字列をリストに変換
-                dynamic settingValue = value;
-                if (settingKey == _selectedFreeGachasKey && value is String) {
-                  try {
-                    final decoded = json.decode(value) as List;
-                    settingValue = decoded;
-                    print(
-                      'Syncing selected free gachas to Firestore: $decoded',
-                    );
-                  } catch (e) {
-                    print('Error decoding selected free gachas: $e');
-                    continue; // デコードに失敗した場合はスキップ
-                  }
-                }
-
-                final success = await FirestoreSettingsService.saveOtherSetting(
-                  userId: userId,
-                  key: settingKey,
-                  value: settingValue,
-                );
-
-                if (success) {
-                  if (settingKey == _selectedFreeGachasKey) {
-                    print(
-                      'Successfully synced selected free gachas to Firestore: $settingValue',
-                    );
-                  } else {
-                    print('Synced other setting $settingKey to Firestore');
-                  }
-                } else {
-                  if (settingKey == _selectedFreeGachasKey) {
-                    print(
-                      'Warning: Failed to sync selected free gachas to Firestore',
-                    );
-                  } else {
-                    print(
-                      'Warning: Failed to sync other setting $settingKey to Firestore',
-                    );
-                  }
-                  // パーミッションエラーの可能性があるが、次の項目も試す
-                }
-              } catch (e) {
-                final errorStr = e.toString().toLowerCase();
-                if (errorStr.contains('permission')) {
-                  hasPermissionError = true;
-                  print(
-                    'Permission error detected, skipping remaining Firestore operations',
-                  );
-                  break;
-                }
-                if (settingKey == _selectedFreeGachasKey) {
-                  print('Error syncing selected free gachas to Firestore: $e');
-                } else {
-                  print(
-                    'Error syncing other setting $settingKey to Firestore: $e',
-                  );
-                }
-              }
-            } else {
-              // 値がnullの場合のログ（デバッグ用）
-              if (settingKey == _selectedFreeGachasKey) {
-                print(
-                  'Warning: Selected free gachas key exists but value is null',
-                );
-              }
-            }
-          }
-        }
-
-        print('Local settings sync to Firestore completed');
+        print('Pending settings sync to Firestore completed');
       });
     } catch (e) {
       print('Error syncing local settings to Firestore: $e');
@@ -1705,56 +1804,31 @@ class SimpleDataManager {
   // ============================================================================
 
   /// ガチャ設定を保存
-  /// 注意: ログイン前の場合はローカルのみに保存される
-  /// ログイン後は syncLocalSettingsToFirestore() で同期される
   static Future<bool> saveGachaSettings(
     String gachaType,
     Map<String, dynamic> settings,
   ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final key = '$_namespace/gacha/$gachaType';
-
-      // デフォルト設定とマージ
-      final defaultSettings = _getDefaultGachaSettings();
-      defaultSettings.addAll(settings);
-      defaultSettings['updatedAt'] = DateTime.now().toIso8601String();
-      defaultSettings['lastUpdated'] = DateTime.now().toIso8601String();
-
-      // ローカルに即座に保存（UXを下げない）
-      await prefs.setString(key, json.encode(defaultSettings));
-
-      // 認証済みユーザーの場合、Firestoreにも同時に保存（非同期、エラーは無視）
-      // 注意: ログイン前の場合はこの処理は実行されない
-      // ログイン後は syncLocalSettingsToFirestore() で同期される
+      final nextSettings = _getDefaultGachaSettings()..addAll(settings);
+      final nowIso = DateTime.now().toIso8601String();
+      nextSettings['updatedAt'] = nowIso;
+      nextSettings['lastUpdated'] = nowIso;
+      await _savePendingSettingOperation(
+        prefs,
+        _pendingGachaSettingsScope(gachaType),
+        _buildPendingSettingReplaceOperation(
+          nextSettings,
+          updatedAt: nowIso,
+        ),
+        invalidateCache: () => _invalidateSettingsCaches(gachaType: gachaType),
+      );
       if (FirebaseAuthService.isAuthenticated) {
         final userId = FirebaseAuthService.userId;
         if (userId != null) {
-          FirestoreSettingsService.saveGachaSettings(
-                userId: userId,
-                gachaType: gachaType,
-                settings: defaultSettings,
-              )
-              .then((success) {
-                if (success) {
-                  print(
-                    'Successfully saved gacha settings to Firestore for $gachaType',
-                  );
-                } else {
-                  print(
-                    'Warning: Failed to save gacha settings to Firestore for $gachaType',
-                  );
-                }
-              })
-              .catchError((e) {
-                print(
-                  'Error saving gacha settings to Firestore (continuing with local save): $e',
-                );
-                // Firestoreエラー時はローカルのみで動作継続
-              });
+          unawaited(_syncPendingGachaSettings(prefs, userId, gachaType));
         }
       }
-
       return true;
     } catch (e) {
       print('Error saving gacha settings: $e');
@@ -1763,144 +1837,9 @@ class SimpleDataManager {
   }
 
   /// ガチャ設定を取得
-  /// ローカルデータを優先して即座に返し、バックグラウンドでFirestoreと同期
   static Future<Map<String, dynamic>> getGachaSettings(String gachaType) async {
     try {
-      // まずローカルデータを即座に取得（遅延なし）
-      final prefs = await SharedPreferences.getInstance();
-      final key = '$_namespace/gacha/$gachaType';
-      final settingsString = prefs.getString(key);
-
-      Map<String, dynamic> localSettings;
-      if (settingsString != null) {
-        final decoded = json.decode(settingsString);
-        if (decoded is Map<String, dynamic>) {
-          localSettings = decoded;
-        } else {
-          localSettings = _getDefaultGachaSettings();
-        }
-      } else {
-        localSettings = _getDefaultGachaSettings();
-      }
-
-      // バックグラウンドでFirestoreから取得を試みる（非同期、エラーは無視）
-      if (FirebaseAuthService.isAuthenticated) {
-        final userId = FirebaseAuthService.userId;
-        if (userId != null) {
-          // 非同期でFirestoreから取得（エラーは無視、UIをブロックしない）
-          FirestoreSettingsService.getGachaSettings(
-                userId: userId,
-                gachaType: gachaType,
-              )
-              .timeout(const Duration(seconds: 2), onTimeout: () => null)
-              .then((firestoreSettings) async {
-                if (firestoreSettings != null) {
-                  // タイムスタンプを比較して新しい方を優先
-                  final localTime = localSettings['lastUpdated'] as String?;
-                  final firestoreTime =
-                      firestoreSettings['lastUpdated'] as String?;
-
-                  if (localTime != null && firestoreTime != null) {
-                    try {
-                      final localDateTime = DateTime.parse(localTime);
-                      final firestoreDateTime = DateTime.parse(firestoreTime);
-
-                      if (firestoreDateTime.isAfter(localDateTime)) {
-                        // Firestoreのデータが新しい場合は、ローカルデータを更新
-                        await prefs.setString(
-                          key,
-                          json.encode(firestoreSettings),
-                        );
-                        print(
-                          'Background sync: Updated local gacha settings from Firestore for $gachaType',
-                        );
-                      } else {
-                        // ローカルデータが新しい場合は、Firestoreを更新
-                        await FirestoreSettingsService.saveGachaSettings(
-                          userId: userId,
-                          gachaType: gachaType,
-                          settings: localSettings,
-                        );
-                      }
-                    } catch (e) {
-                      // パースエラー時はパースに成功した方を採用
-                      DateTime? localDateTime;
-                      DateTime? firestoreDateTime;
-
-                      try {
-                        localDateTime = DateTime.parse(localTime);
-                      } catch (e) {
-                        // ローカルのパース失敗
-                      }
-
-                      try {
-                        firestoreDateTime = DateTime.parse(firestoreTime);
-                      } catch (e) {
-                        // Firestoreのパース失敗
-                      }
-
-                      if (firestoreDateTime != null && localDateTime != null) {
-                        // 両方成功した場合は比較（通常はここには来ない）
-                        if (firestoreDateTime.isAfter(localDateTime)) {
-                          await prefs.setString(
-                            key,
-                            json.encode(firestoreSettings),
-                          );
-                          print(
-                            'Background sync: Updated local gacha settings from Firestore for $gachaType',
-                          );
-                        } else {
-                          await FirestoreSettingsService.saveGachaSettings(
-                            userId: userId,
-                            gachaType: gachaType,
-                            settings: localSettings,
-                          );
-                        }
-                      } else if (firestoreDateTime != null) {
-                        // Firestoreのみ成功
-                        await prefs.setString(
-                          key,
-                          json.encode(firestoreSettings),
-                        );
-                        print(
-                          'Background sync: Updated local gacha settings from Firestore for $gachaType',
-                        );
-                      } else if (localDateTime != null) {
-                        // ローカルのみ成功
-                        await FirestoreSettingsService.saveGachaSettings(
-                          userId: userId,
-                          gachaType: gachaType,
-                          settings: localSettings,
-                        );
-                      } else {
-                        // 両方失敗した場合はFirestoreを優先（新しい物を採用の方針）
-                        await prefs.setString(
-                          key,
-                          json.encode(firestoreSettings),
-                        );
-                        print(
-                          'Background sync: Updated local gacha settings from Firestore for $gachaType',
-                        );
-                      }
-                    }
-                  } else if (firestoreTime != null) {
-                    // ローカルにタイムスタンプがない場合は、Firestoreのデータを使用
-                    await prefs.setString(key, json.encode(firestoreSettings));
-                    print(
-                      'Background sync: Updated local gacha settings from Firestore for $gachaType',
-                    );
-                  }
-                }
-              })
-              .catchError((e) {
-                // エラーは無視（バックグラウンド処理のため）
-                print('Background sync error (ignored): $e');
-              });
-        }
-      }
-
-      // ローカルデータを即座に返す
-      return localSettings;
+      return _resolveDisplayGachaSettings(gachaType);
     } catch (e) {
       print('Error getting gacha settings: $e');
       return _getDefaultGachaSettings();
@@ -1941,39 +1880,25 @@ class SimpleDataManager {
   static Future<bool> saveUserSettings(Map<String, dynamic> settings) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final key = '$_namespace/user_settings';
-
-      // タイムスタンプを追加
-      final settingsWithTimestamp = Map<String, dynamic>.from(settings);
-      settingsWithTimestamp['lastUpdated'] = DateTime.now().toIso8601String();
-
-      // ローカルに即座に保存（UXを下げない）
-      await prefs.setString(key, json.encode(settingsWithTimestamp));
-
-      // 認証済みユーザーの場合、Firestoreにも同時に保存（非同期、エラーは無視）
+      final current = await _resolveDisplayUserSettings();
+      final nextSettings = Map<String, dynamic>.from(current)..addAll(settings);
+      final nowIso = DateTime.now().toIso8601String();
+      nextSettings['lastUpdated'] = nowIso;
+      await _savePendingSettingOperation(
+        prefs,
+        _pendingUserSettingsScope,
+        _buildPendingSettingReplaceOperation(
+          nextSettings,
+          updatedAt: nowIso,
+        ),
+        invalidateCache: _invalidateSettingsCaches,
+      );
       if (FirebaseAuthService.isAuthenticated) {
         final userId = FirebaseAuthService.userId;
         if (userId != null) {
-          FirestoreSettingsService.saveUserSettings(
-                userId: userId,
-                settings: settingsWithTimestamp,
-              )
-              .then((success) {
-                if (success) {
-                  print('Successfully saved user settings to Firestore');
-                } else {
-                  print('Warning: Failed to save user settings to Firestore');
-                }
-              })
-              .catchError((e) {
-                print(
-                  'Error saving user settings to Firestore (continuing with local save): $e',
-                );
-                // Firestoreエラー時はローカルのみで動作継続
-              });
+          unawaited(_syncPendingUserSettings(prefs, userId));
         }
       }
-
       return true;
     } catch (e) {
       print('Error saving user settings: $e');
@@ -1982,138 +1907,9 @@ class SimpleDataManager {
   }
 
   /// ユーザー設定を取得（将来の拡張用）
-  /// ローカルデータを優先して即座に返し、バックグラウンドでFirestoreと同期
   static Future<Map<String, dynamic>> getUserSettings() async {
     try {
-      // まずローカルデータを即座に取得（遅延なし）
-      final prefs = await SharedPreferences.getInstance();
-      final key = '$_namespace/user_settings';
-      final settingsString = prefs.getString(key);
-
-      Map<String, dynamic> localSettings;
-      if (settingsString != null) {
-        final decoded = json.decode(settingsString);
-        if (decoded is Map<String, dynamic>) {
-          localSettings = decoded;
-        } else {
-          localSettings = {};
-        }
-      } else {
-        localSettings = {};
-      }
-
-      // バックグラウンドでFirestoreから取得を試みる（非同期、エラーは無視）
-      if (FirebaseAuthService.isAuthenticated) {
-        final userId = FirebaseAuthService.userId;
-        if (userId != null) {
-          // 非同期でFirestoreから取得（エラーは無視、UIをブロックしない）
-          FirestoreSettingsService.getUserSettings(userId: userId)
-              .timeout(const Duration(seconds: 2), onTimeout: () => null)
-              .then((firestoreSettings) async {
-                if (firestoreSettings != null) {
-                  // タイムスタンプを比較して新しい方を優先
-                  final localTime = localSettings['lastUpdated'] as String?;
-                  final firestoreTime =
-                      firestoreSettings['lastUpdated'] as String?;
-
-                  if (localTime != null && firestoreTime != null) {
-                    try {
-                      final localDateTime = DateTime.parse(localTime);
-                      final firestoreDateTime = DateTime.parse(firestoreTime);
-
-                      if (firestoreDateTime.isAfter(localDateTime)) {
-                        // Firestoreのデータが新しい場合は、ローカルデータを更新
-                        await prefs.setString(
-                          key,
-                          json.encode(firestoreSettings),
-                        );
-                        print(
-                          'Background sync: Updated local user settings from Firestore',
-                        );
-                      } else {
-                        // ローカルデータが新しい場合は、Firestoreを更新
-                        await FirestoreSettingsService.saveUserSettings(
-                          userId: userId,
-                          settings: localSettings,
-                        );
-                      }
-                    } catch (e) {
-                      // パースエラー時はパースに成功した方を採用
-                      DateTime? localDateTime;
-                      DateTime? firestoreDateTime;
-
-                      try {
-                        localDateTime = DateTime.parse(localTime);
-                      } catch (e) {
-                        // ローカルのパース失敗
-                      }
-
-                      try {
-                        firestoreDateTime = DateTime.parse(firestoreTime);
-                      } catch (e) {
-                        // Firestoreのパース失敗
-                      }
-
-                      if (firestoreDateTime != null && localDateTime != null) {
-                        // 両方成功した場合は比較（通常はここには来ない）
-                        if (firestoreDateTime.isAfter(localDateTime)) {
-                          await prefs.setString(
-                            key,
-                            json.encode(firestoreSettings),
-                          );
-                          print(
-                            'Background sync: Updated local user settings from Firestore',
-                          );
-                        } else {
-                          await FirestoreSettingsService.saveUserSettings(
-                            userId: userId,
-                            settings: localSettings,
-                          );
-                        }
-                      } else if (firestoreDateTime != null) {
-                        // Firestoreのみ成功
-                        await prefs.setString(
-                          key,
-                          json.encode(firestoreSettings),
-                        );
-                        print(
-                          'Background sync: Updated local user settings from Firestore',
-                        );
-                      } else if (localDateTime != null) {
-                        // ローカルのみ成功
-                        await FirestoreSettingsService.saveUserSettings(
-                          userId: userId,
-                          settings: localSettings,
-                        );
-                      } else {
-                        // 両方失敗した場合はFirestoreを優先（新しい物を採用の方針）
-                        await prefs.setString(
-                          key,
-                          json.encode(firestoreSettings),
-                        );
-                        print(
-                          'Background sync: Updated local user settings from Firestore',
-                        );
-                      }
-                    }
-                  } else if (firestoreTime != null) {
-                    // ローカルにタイムスタンプがない場合は、Firestoreのデータを使用
-                    await prefs.setString(key, json.encode(firestoreSettings));
-                    print(
-                      'Background sync: Updated local user settings from Firestore',
-                    );
-                  }
-                }
-              })
-              .catchError((e) {
-                // エラーは無視（バックグラウンド処理のため）
-                print('Background sync error (ignored): $e');
-              });
-        }
-      }
-
-      // ローカルデータを即座に返す
-      return localSettings;
+      return _resolveDisplayUserSettings();
     } catch (e) {
       print('Error getting user settings: $e');
       return {};
@@ -2283,6 +2079,7 @@ class SimpleDataManager {
       }
 
       _invalidateLearningCaches();
+      _invalidateSettingsCaches();
       print('Cleared $clearedCount account-specific data keys');
       return true;
     } catch (e) {
@@ -2320,51 +2117,37 @@ class SimpleDataManager {
   static const String _selectedFreeGachasKey =
       '$_namespace/selected_free_gachas';
 
-  /// 選択された無料ガチャのリストを取得
-  static Future<List<String>> getSelectedFreeGachas() async {
+  static Future<bool> saveOtherSettingValue(String key, dynamic value) async {
     try {
-      // まずローカルデータを即座に取得（遅延なし）
       final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_selectedFreeGachasKey);
-
-      List<String> localSelected = [];
-      if (jsonString != null) {
-        try {
-          final List<dynamic> decoded = json.decode(jsonString);
-          localSelected = decoded.cast<String>();
-        } catch (e) {
-          print('Error decoding selected free gachas: $e');
-        }
-      }
-
-      // バックグラウンドでFirestoreから取得を試みる（非同期、エラーは無視）
+      final nowIso = DateTime.now().toIso8601String();
+      await _savePendingSettingOperation(
+        prefs,
+        _pendingOtherSettingScope(key),
+        _buildPendingSettingReplaceOperation(value, updatedAt: nowIso),
+        invalidateCache: () => _invalidateSettingsCaches(otherSettingKey: key),
+      );
       if (FirebaseAuthService.isAuthenticated) {
         final userId = FirebaseAuthService.userId;
         if (userId != null) {
-          FirestoreSettingsService.getOtherSetting(
-                userId: userId,
-                key: _selectedFreeGachasKey,
-              )
-              .timeout(const Duration(seconds: 2), onTimeout: () => null)
-              .then((firestoreValue) async {
-                if (firestoreValue != null && firestoreValue is List) {
-                  final firestoreSelected = firestoreValue.cast<String>();
-                  if (firestoreSelected.isNotEmpty) {
-                    final jsonString = json.encode(firestoreSelected);
-                    await prefs.setString(_selectedFreeGachasKey, jsonString);
-                    print(
-                      'Background sync: Updated selected free gachas from Firestore',
-                    );
-                  }
-                }
-              })
-              .catchError((e) {
-                print('Background sync error (ignored): $e');
-              });
+          unawaited(_syncPendingOtherSetting(prefs, userId, key));
         }
       }
+      return true;
+    } catch (e) {
+      print('Error saving other setting $key: $e');
+      return false;
+    }
+  }
 
-      return localSelected;
+  /// 選択された無料ガチャのリストを取得
+  static Future<List<String>> getSelectedFreeGachas() async {
+    try {
+      final value = await getOtherSettingValue(
+        _selectedFreeGachasKey,
+        legacyDecoder: _decodeSelectedFreeGachasLegacyValue,
+      );
+      return _normalizeStringList(value, maxLength: 2);
     } catch (e) {
       print('Error getting selected free gachas: $e');
       return [];
@@ -2372,8 +2155,6 @@ class SimpleDataManager {
   }
 
   /// 選択された無料ガチャを保存
-  /// 注意: 2ガチャ選択時は通常ログイン前なので、ローカルのみに保存される
-  /// ログイン後は syncLocalSettingsToFirestore() で同期される
   static Future<bool> saveSelectedFreeGachas(List<String> prefsPrefixes) async {
     try {
       if (prefsPrefixes.length > 2) {
@@ -2382,39 +2163,7 @@ class SimpleDataManager {
         );
         prefsPrefixes = prefsPrefixes.take(2).toList();
       }
-
-      final prefs = await SharedPreferences.getInstance();
-      final jsonString = json.encode(prefsPrefixes);
-      await prefs.setString(_selectedFreeGachasKey, jsonString);
-
-      // 認証済みユーザーの場合、Firestoreにもバックアップ（非同期、エラーは無視）
-      // 注意: 2ガチャ選択時は通常ログイン前なので、この処理は実行されない
-      // ログイン後は syncLocalSettingsToFirestore() で同期される
-      if (FirebaseAuthService.isAuthenticated) {
-        final userId = FirebaseAuthService.userId;
-        if (userId != null) {
-          FirestoreSettingsService.saveOtherSetting(
-                userId: userId,
-                key: _selectedFreeGachasKey,
-                value: prefsPrefixes,
-              )
-              .then((success) {
-                if (success) {
-                  print('Successfully saved selected free gachas to Firestore');
-                } else {
-                  print(
-                    'Warning: Failed to save selected free gachas to Firestore',
-                  );
-                }
-              })
-              .catchError((e) {
-                print(
-                  'Error saving selected free gachas to Firestore (continuing with local save): $e',
-                );
-              });
-        }
-      }
-
+      await saveOtherSettingValue(_selectedFreeGachasKey, prefsPrefixes);
       print('Saved selected free gachas: $prefsPrefixes');
       return true;
     } catch (e) {

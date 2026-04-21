@@ -1,6 +1,5 @@
 // lib/widgets/filter_chips.dart
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../pages/common/aggregation_mode.dart';
 import '../../services/problems/exclusion_logic.dart';
 import '../../models/learning_status.dart';
@@ -573,8 +572,10 @@ class _GachaExclusionFilterWidgetState extends State<GachaExclusionFilterWidget>
     if (selected != null && selected != widget.exclusionMode) {
       widget.onExclusionModeChanged!(selected);
       // 設定を保存
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('${widget.prefsPrefix}_gacha_exclusion_mode', selected.index);
+      await SimpleDataManager.saveOtherSettingValue(
+        '${widget.prefsPrefix}_gacha_exclusion_mode',
+        selected.index,
+      );
     }
   }
 
