@@ -1,7 +1,7 @@
 // lib/services/exclusion_logic.dart
 // 除外ルール系の処理
 
-import '../../models/math_problem.dart';
+import '../../problems/unit/unit_expr_problem.dart';
 import 'simple_data_manager.dart';
 import '../../localization/app_localizations.dart';
 
@@ -116,5 +116,53 @@ bool shouldExcludeByModeUsingHistory(
     }
   }
   return false;
+}
+
+/// UnitExprProblem 内の全 UnitProblem が除外条件（N 連続正解）を満たすか。
+Future<bool> isExprProblemFullyExcluded(
+  UnitExprProblem ep,
+  ExclusionMode exclusionMode,
+) async {
+  if (exclusionMode == ExclusionMode.none) return false;
+  if (ep.unitProblems.isEmpty) return false;
+
+  for (final up in ep.unitProblems) {
+    if (!await shouldExcludeByMode(up, exclusionMode)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/// ガチャに残る UnitExprProblem の件数（1 expr = 1問）。
+Future<int> countRemainingExprProblems(
+  List<UnitExprProblem> exprProblems,
+  ExclusionMode exclusionMode,
+) async {
+  if (exclusionMode == ExclusionMode.none) {
+    return exprProblems.length;
+  }
+
+  var count = 0;
+  for (final ep in exprProblems) {
+    if (!await isExprProblemFullyExcluded(ep, exclusionMode)) {
+      count++;
+    }
+  }
+  return count;
+}
+
+/// ExclusionMode を latestN（1〜3）から構築する。
+ExclusionMode exclusionModeFromLatestN(int latestN) {
+  switch (latestN) {
+    case 1:
+      return ExclusionMode.latest1;
+    case 2:
+      return ExclusionMode.latest2;
+    case 3:
+      return ExclusionMode.latest3;
+    default:
+      return ExclusionMode.latest1;
+  }
 }
 

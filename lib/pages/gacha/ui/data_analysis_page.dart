@@ -9,7 +9,6 @@ import '../../../localization/app_localizations.dart';
 import '../../../localization/app_locale.dart';
 import '../../../problems/unit/symbol.dart' show UnitCategory;
 import '../../../services/auth/firebase_auth_service.dart';
-import '../../../services/auth/firestore_attempt_event_service.dart' show AttemptEventUpsertErrorKind;
 import '../../../services/auth/firestore_public_profile_service.dart';
 import '../../../services/ranking/unit_gacha_leaderboard_service.dart';
 import '../../../services/problems/simple_data_manager.dart';
@@ -82,8 +81,6 @@ class _DataAnalysisPageState extends State<DataAnalysisPage> {
   String? _leaderboardUserIdCache;
   bool _isRankingRefreshing = false;
   int _rankingRefreshOpId = 0;
-  UnitGachaAttemptSyncResult? _lastAttemptSync;
-  int? _attemptQueueLen;
 
   VoidCallback? _learningEpochListener;
   Timer? _learningEpochDebounce;
@@ -164,7 +161,7 @@ class _DataAnalysisPageState extends State<DataAnalysisPage> {
   // ===========================================================================
   // Ranking UI (unit_gacha)
   // - Reads leaderboard docs from Firestore
-  // - Also triggers best-effort background sync of queued attempt events, then refreshes UI
+  // - Refreshes leaderboard reads (ranking is updated server-side from learning_records)
   // ===========================================================================
 
   bool get _isLoggedIn => FirebaseAuthService.isAuthenticated;
@@ -260,24 +257,13 @@ class _DataAnalysisPageState extends State<DataAnalysisPage> {
         await FirestorePublicProfileService.autoRepairUnitGachaParticipationIfNeeded(userId: uid);
       } catch (_) {}
 
-      // 1) Best-effort: upload queued attempt events (non-blocking for the user)
-      UnitGachaAttemptSyncResult? attemptSync;
+      // 1) Sync learning history to cloud so Functions can update ranking
       try {
-        attemptSync = await SimpleDataManager.syncUnitGachaAttemptEventsToFirestore();
-      } catch (_) {
-        // Ignore: we still attempt to refresh reads (could have already been synced)
-      }
-      int? queueLen;
-      try {
-        queueLen = await SimpleDataManager.getUnitGachaAttemptQueueLength();
+        await SimpleDataManager.syncLocalDataToFirestore();
       } catch (_) {}
 
       if (!mounted) return;
       if (opId != _rankingRefreshOpId) return;
-      setState(() {
-        _lastAttemptSync = attemptSync ?? _lastAttemptSync;
-        _attemptQueueLen = queueLen ?? _attemptQueueLen;
-      });
 
       // 2) Refresh reads (overall + current weekly)
       setState(() {
@@ -488,30 +474,9 @@ class _DataAnalysisPageState extends State<DataAnalysisPage> {
         final myScore = lb.myScore;
 
         final isJa = AppLocale.isJapanese(context);
-        final attemptSync = _lastAttemptSync;
-        final attemptQueueLen = _attemptQueueLen;
-        String attemptSyncLine() {
-          final q = attemptQueueLen;
-          final parts = <String>[];
-          // NOTE: 「送信待ち」「送信残り」は統計ページのランキングでは一旦非表示（必要なら復活）
-          // if (q != null) parts.add(isJa ? '送信待ち: $q' : 'Queued: $q');
-          if (attemptSync != null) {
-            parts.add(isJa ? '送信: ${attemptSync.sent}/${attemptSync.attempted}' : 'Sent: ${attemptSync.sent}/${attemptSync.attempted}');
-            // parts.add(isJa ? '残: ${attemptSync.remaining}' : 'Remain: ${attemptSync.remaining}');
-            if (attemptSync.lastErrorKind != null) {
-              final k = attemptSync.lastErrorKind!;
-              final kStr = switch (k) {
-                AttemptEventUpsertErrorKind.permissionDenied => isJa ? '権限エラー' : 'permission',
-                AttemptEventUpsertErrorKind.unauthenticated => isJa ? '未ログイン' : 'unauth',
-                AttemptEventUpsertErrorKind.network => isJa ? '通信' : 'network',
-                AttemptEventUpsertErrorKind.unknown => isJa ? '不明' : 'unknown',
-              };
-              parts.add(isJa ? '直近: $kStr' : 'Last: $kStr');
-            }
-          }
-          if (parts.isEmpty) return isJa ? 'ランキングが更新されない場合は「同期&更新」を押してください' : 'If ranking does not update, tap “Sync & Refresh”.';
-          return parts.join(isJa ? ' / ' : ' / ');
-        }
+        final rankingHint = isJa
+            ? 'ランキングはクラウドの学習履歴から更新されます。反映されない場合は「同期」を押してください。'
+            : 'Ranking is derived from cloud learning history. Tap Sync if it looks stale.';
         return Container(
           width: double.infinity,
           margin: const EdgeInsets.only(top: 8),
@@ -557,7 +522,7 @@ class _DataAnalysisPageState extends State<DataAnalysisPage> {
               ),
               const SizedBox(height: 4),
               Text(
-                attemptSyncLine(),
+                rankingHint,
                 style: TextStyle(fontSize: 12, color: Colors.grey[700], fontWeight: FontWeight.w600),
               ),
               if (_isRankingRefreshing) ...[
@@ -940,20 +905,8 @@ class _DataAnalysisPageState extends State<DataAnalysisPage> {
       });
     };
     SimpleDataManager.learningDataEpochListenable.addListener(_learningEpochListener!);
-    // Non-blocking: try syncing queued attempt events after the first frame, then refresh ranking UI.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      unawaited(() async {
-        try {
-          final last = await SimpleDataManager.loadLastUnitGachaAttemptSyncResult();
-          final q = await SimpleDataManager.getUnitGachaAttemptQueueLength();
-          if (!mounted) return;
-          setState(() {
-            _lastAttemptSync = last ?? _lastAttemptSync;
-            _attemptQueueLen = q;
-          });
-        } catch (_) {}
-      }());
       _kickoffRankingBackgroundRefresh(reason: 'page_open', bestEffortWeeklyRetry: true);
     });
   }

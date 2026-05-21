@@ -331,6 +331,26 @@ class FirestoreSettingsService {
     }
   }
 
+  /// その他の設定の最終更新時刻を取得（端末とクラウドの新旧比較用）
+  static Future<DateTime?> getOtherSettingUpdatedAt({
+    required String userId,
+    required String key,
+  }) async {
+    try {
+      final encodedKey = _encodeKey(key);
+      final settingDoc = await _getOtherSettingsRef(userId).doc(encodedKey).get();
+      if (!settingDoc.exists) return null;
+      final data = settingDoc.data() as Map<String, dynamic>?;
+      if (data == null) return null;
+      final lastUpdated = data['lastUpdated'];
+      if (lastUpdated is Timestamp) return lastUpdated.toDate();
+      if (lastUpdated is String) return DateTime.tryParse(lastUpdated);
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// 全その他の設定を取得
   static Future<Map<String, dynamic>> getAllOtherSettings({
     required String userId,

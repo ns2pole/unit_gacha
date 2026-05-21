@@ -906,27 +906,19 @@ class _AuthPageState extends State<AuthPage> {
       // UIスレッドに制御を戻す
       await Future.delayed(Duration.zero);
 
-      // アカウント切り替えを検知
-      final isAccountSwitched = await SimpleDataManager.isAccountSwitched();
-
-      // UIスレッドに制御を戻す
+      if (await SimpleDataManager.isAccountSwitched()) {
+        print('Account switch detected, merging local data to new account...');
+      }
       await Future.delayed(const Duration(milliseconds: 50));
 
-      if (isAccountSwitched) {
-        print('Account switch detected, clearing pending local data...');
-        await SimpleDataManager.syncOnAccountSwitch();
-      } else {
-        await SimpleDataManager.syncLocalDataToFirestore();
-        await Future.delayed(const Duration(milliseconds: 50));
+      await SimpleDataManager.syncLocalDataToFirestore();
+      await Future.delayed(const Duration(milliseconds: 50));
+      await SimpleDataManager.syncLocalSettingsToFirestore();
+      await Future.delayed(const Duration(milliseconds: 50));
 
-        await SimpleDataManager.syncLocalSettingsToFirestore();
-        await Future.delayed(const Duration(milliseconds: 50));
-
-        // 現在のユーザーIDを保存（次回のアカウント切り替え検知用）
-        final currentUserId = FirebaseAuthService.userId;
-        if (currentUserId != null) {
-          await SimpleDataManager.setLastUserId(currentUserId);
-        }
+      final currentUserId = FirebaseAuthService.userId;
+      if (currentUserId != null) {
+        await SimpleDataManager.setLastUserId(currentUserId);
       }
 
       print('Background sync completed');

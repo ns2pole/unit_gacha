@@ -19,7 +19,7 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 [bundle exec] fastlane release_all_platforms
 ```
 
-iOS と Android の両方を一撃でリリース
+iOS と Android の両方を一撃でリリース（ストア審査提出まで）
 
 options: skip_build:true, skip_ios:true, skip_android:true, notes:'...', notes_en:'...'
 

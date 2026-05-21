@@ -1,4 +1,4 @@
-// lib/services/simple_data_manager.dart
+// lib/services/problems/simple_data_manager.dart
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -6,189 +6,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/math_problem.dart';
 import '../../models/learning_status.dart';
 import '../../pages/common/problem_status.dart';
-import '../../problems/unit/symbol.dart' show UnitCategory;
-import '../payment/revenuecat_service.dart';
 import '../auth/firebase_auth_service.dart';
 import '../auth/firestore_learning_service.dart';
 import '../auth/firestore_settings_service.dart';
-import '../auth/firestore_attempt_event_service.dart';
 import '../../managers/app_logger.dart';
-
-class UnitGachaAttemptSyncResult {
-  final int attempted; // valid events attempted to upload
-  final int sent; // successfully uploaded
-  final int remaining; // left in queue after sync
-  final AttemptEventUpsertErrorKind? lastErrorKind;
-  final String? lastErrorCode;
-  final String ranAtIso;
-
-  const UnitGachaAttemptSyncResult({
-    required this.attempted,
-    required this.sent,
-    required this.remaining,
-    this.lastErrorKind,
-    this.lastErrorCode,
-    required this.ranAtIso,
-  });
-
-  Map<String, dynamic> toJson() => {
-    'attempted': attempted,
-    'sent': sent,
-    'remaining': remaining,
-    'lastErrorKind': lastErrorKind?.name,
-    'lastErrorCode': lastErrorCode,
-    'ranAtIso': ranAtIso,
-  };
-
-  static UnitGachaAttemptSyncResult fromJson(Map<String, dynamic> json) {
-    final kindStr = json['lastErrorKind'];
-    AttemptEventUpsertErrorKind? kind;
-    if (kindStr is String) {
-      for (final k in AttemptEventUpsertErrorKind.values) {
-        if (k.name == kindStr) {
-          kind = k;
-          break;
-        }
-      }
-    }
-    return UnitGachaAttemptSyncResult(
-      attempted: (json['attempted'] as num?)?.toInt() ?? 0,
-      sent: (json['sent'] as num?)?.toInt() ?? 0,
-      remaining: (json['remaining'] as num?)?.toInt() ?? 0,
-      lastErrorKind: kind,
-      lastErrorCode: json['lastErrorCode'] as String?,
-      ranAtIso:
-          (json['ranAtIso'] as String?) ?? DateTime.now().toIso8601String(),
-    );
-  }
-}
 
 /// シンプルで拡張可能なデータ管理システム
 /// 現在の必要最小限のデータ + 将来の拡張に対応
 class SimpleDataManager {
+  /// Local storage prefix. Intentionally unchanged from the joymath fork so
+  /// existing installs keep their SharedPreferences data without migration.
   static const String _namespace = 'joymath_simple';
   static const String _version = '1.0.0';
   static const String _versionKey = '$_namespace/version';
   static const String _lastUserIdKey = '$_namespace/last_user_id';
-  static const String _unitGachaAttemptQueueKey =
-      '$_namespace/unit_gacha_attempt_events_queue_v1';
-  static const String _unitGachaAttemptLastSyncKey =
-      '$_namespace/unit_gacha_attempt_events_last_sync_v1';
-  static const int _unitGachaAttemptQueueMax = 5000;
-
-  // ============================================================================
-  // Purchase recommend (category) counters
-  // - We recommend purchase once per category when attempts reach a threshold.
-  // ============================================================================
-  static const String _purchaseRecommendAttemptCountMechanicsKey =
-      '$_namespace/purchase_recommend_attempt_count_mechanics_v1';
-  static const String _purchaseRecommendAttemptCountElectromagnetismKey =
-      '$_namespace/purchase_recommend_attempt_count_electromagnetism_v1';
-  static const String _purchaseRecommendPendingMechanicsKey =
-      '$_namespace/purchase_recommend_pending_mechanics_v1';
-  static const String _purchaseRecommendPendingElectromagnetismKey =
-      '$_namespace/purchase_recommend_pending_electromagnetism_v1';
-  static const String _purchaseRecommendShownMechanicsKey =
-      '$_namespace/purchase_recommend_shown_mechanics_v1';
-  static const String _purchaseRecommendShownElectromagnetismKey =
-      '$_namespace/purchase_recommend_shown_electromagnetism_v1';
-
-  static String? _attemptCountKeyFor(UnitCategory c) {
-    switch (c) {
-      case UnitCategory.mechanics:
-        return _purchaseRecommendAttemptCountMechanicsKey;
-      case UnitCategory.electromagnetism:
-        return _purchaseRecommendAttemptCountElectromagnetismKey;
-      case UnitCategory.thermodynamics:
-      case UnitCategory.waves:
-      case UnitCategory.atom:
-        return null;
-    }
-  }
-
-  static String? _pendingKeyFor(UnitCategory c) {
-    switch (c) {
-      case UnitCategory.mechanics:
-        return _purchaseRecommendPendingMechanicsKey;
-      case UnitCategory.electromagnetism:
-        return _purchaseRecommendPendingElectromagnetismKey;
-      case UnitCategory.thermodynamics:
-      case UnitCategory.waves:
-      case UnitCategory.atom:
-        return null;
-    }
-  }
-
-  static String? _shownKeyFor(UnitCategory c) {
-    switch (c) {
-      case UnitCategory.mechanics:
-        return _purchaseRecommendShownMechanicsKey;
-      case UnitCategory.electromagnetism:
-        return _purchaseRecommendShownElectromagnetismKey;
-      case UnitCategory.thermodynamics:
-      case UnitCategory.waves:
-      case UnitCategory.atom:
-        return null;
-    }
-  }
-
-  /// Category attempt count (unit gacha confirm presses; correct/incorrect both count).
-  static Future<int> getPurchaseRecommendAttemptCount(
-    UnitCategory category,
-  ) async {
-    final key = _attemptCountKeyFor(category);
-    if (key == null) return 0;
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt(key) ?? 0;
-  }
-
-  /// Increments and returns the updated category attempt count.
-  static Future<int> incrementPurchaseRecommendAttemptCount(
-    UnitCategory category,
-  ) async {
-    final key = _attemptCountKeyFor(category);
-    if (key == null) return 0;
-    final prefs = await SharedPreferences.getInstance();
-    final next = (prefs.getInt(key) ?? 0) + 1;
-    await prefs.setInt(key, next);
-    return next;
-  }
-
-  /// Whether the recommend dialog is pending to be shown (reached threshold but not shown yet).
-  static Future<bool> getPurchaseRecommendPending(UnitCategory category) async {
-    final key = _pendingKeyFor(category);
-    if (key == null) return false;
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(key) ?? false;
-  }
-
-  static Future<void> setPurchaseRecommendPending(
-    UnitCategory category,
-    bool value,
-  ) async {
-    final key = _pendingKeyFor(category);
-    if (key == null) return;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(key, value);
-  }
-
-  /// Whether the recommend dialog has already been shown (once per category).
-  static Future<bool> getPurchaseRecommendShown(UnitCategory category) async {
-    final key = _shownKeyFor(category);
-    if (key == null) return false;
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(key) ?? false;
-  }
-
-  static Future<void> setPurchaseRecommendShown(
-    UnitCategory category,
-    bool value,
-  ) async {
-    final key = _shownKeyFor(category);
-    if (key == null) return;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(key, value);
-  }
 
   // ============================================================================
   // Cloud sync in-flight indicator (UI can subscribe to show loading state)
@@ -221,11 +52,6 @@ class SimpleDataManager {
   static final Map<String, Map<String, dynamic>> _gachaSettingsCache = {};
   static Map<String, dynamic>? _userSettingsCache;
   static final Map<String, dynamic> _otherSettingsCache = {};
-  static List<Map<String, dynamic>>? _unitGachaAttemptQueueCache;
-  static UnitGachaAttemptSyncResult? _lastUnitGachaAttemptSyncResult;
-
-  static UnitGachaAttemptSyncResult? get lastUnitGachaAttemptSyncResult =>
-      _lastUnitGachaAttemptSyncResult;
 
   // ============================================================================
   // Learning data update notifier (UI can subscribe to refresh counts/filters)
@@ -419,6 +245,74 @@ class SimpleDataManager {
     };
   }
 
+  /// 端末内の学習記録を読む（SharedPreferences の JSON を正本とする）
+  static Future<Map<String, dynamic>> _loadLocalLearningRecord(
+    SharedPreferences prefs,
+    String problemId,
+  ) async {
+    final raw = prefs.getString(_legacyLearningKey(problemId));
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = json.decode(raw);
+        if (decoded is Map) {
+          final map = Map<String, dynamic>.from(decoded);
+          return _buildLearningRecordData(
+            problemId: problemId,
+            history: map['history'],
+            fallbackUpdatedAt: map['lastUpdated'] as String?,
+          );
+        }
+      } catch (_) {}
+    }
+
+    // 旧 pending キューだけ残っている場合は取り込んでから正本へ移す
+    final pending = await _loadPendingLearningOperations(prefs, problemId);
+    if (pending.isEmpty) {
+      return _buildLearningRecordData(problemId: problemId, history: const []);
+    }
+    final history = _applyPendingLearningOperations(const [], pending);
+    final record = _buildLearningRecordData(
+      problemId: problemId,
+      history: history,
+    );
+    await _saveLocalLearningRecord(prefs, problemId, record, notify: false);
+    return record;
+  }
+
+  /// 端末内の学習記録を書く（読み取りと同じキーへ直書き）
+  static Future<void> _saveLocalLearningRecord(
+    SharedPreferences prefs,
+    String problemId,
+    Map<String, dynamic> data, {
+    bool notify = true,
+  }) async {
+    final record = _buildLearningRecordData(
+      problemId: problemId,
+      history: data['history'],
+      fallbackUpdatedAt: data['lastUpdated'] as String?,
+    );
+    await prefs.setString(_legacyLearningKey(problemId), json.encode(record));
+    await prefs.remove(_pendingLearningOpsKey(problemId));
+
+    final history = _normalizeHistoryList(
+      record['history'],
+      maxEntries: learningHistoryRetentionCount,
+    );
+    _learningDataCache[problemId] = Map<String, dynamic>.from(record);
+    _learningHistoryCache[problemId] = List<Map<String, dynamic>>.from(history);
+    if (notify) _notifyLearningDataChanged();
+  }
+
+  static List<Map<String, dynamic>> _mergeHistoryLists(
+    List<Map<String, dynamic>> a,
+    List<Map<String, dynamic>> b,
+  ) {
+    return _normalizeHistoryList(
+      [...a, ...b],
+      maxEntries: learningHistoryRetentionCount,
+    );
+  }
+
   static Map<String, dynamic>? _normalizePendingOperation(dynamic raw) {
     if (raw is! Map) return null;
     final kind = raw['kind'] as String?;
@@ -577,52 +471,33 @@ class SimpleDataManager {
   static Future<Map<String, dynamic>> _resolveDisplayLearningData(
     String problemId,
   ) async {
-    final canUseCache = !FirebaseAuthService.isAuthenticated;
     final cached = _learningDataCache[problemId];
-    if (canUseCache && cached != null) return Map<String, dynamic>.from(cached);
+    if (cached != null) return Map<String, dynamic>.from(cached);
 
     final prefs = await SharedPreferences.getInstance();
-    final pendingOperations = await _loadPendingLearningOperations(
-      prefs,
-      problemId,
-    );
+    final local = await _loadLocalLearningRecord(prefs, problemId);
+    var resolvedHistory =
+        local['history'] as List<Map<String, dynamic>>? ?? const [];
 
-    Map<String, dynamic>? cloudData;
     final userId = FirebaseAuthService.userId;
     if (FirebaseAuthService.isAuthenticated && userId != null) {
       try {
-        cloudData = await _fetchCloudLearningRecord(userId, problemId);
-      } catch (_) {
-        cloudData = null;
-      }
+        final cloudData = await _fetchCloudLearningRecord(userId, problemId);
+        final cloudHistory =
+            cloudData?['history'] as List<Map<String, dynamic>>? ?? const [];
+        resolvedHistory = _mergeHistoryLists(resolvedHistory, cloudHistory);
+      } catch (_) {}
     }
 
-    final resolvedHistory = _applyPendingLearningOperations(
-      cloudData?['history'] as List<Map<String, dynamic>>? ?? const [],
-      pendingOperations,
-    );
     final resolved = _buildLearningRecordData(
       problemId: problemId,
       history: resolvedHistory,
-      fallbackUpdatedAt: cloudData?['lastUpdated'] as String?,
     );
-    if (canUseCache) {
-      _learningDataCache[problemId] = Map<String, dynamic>.from(resolved);
-      _learningHistoryCache[problemId] = List<Map<String, dynamic>>.from(
-        resolvedHistory,
-      );
-    }
+    _learningDataCache[problemId] = Map<String, dynamic>.from(resolved);
+    _learningHistoryCache[problemId] = List<Map<String, dynamic>>.from(
+      resolvedHistory,
+    );
     return Map<String, dynamic>.from(resolved);
-  }
-
-  static Future<void> _enqueuePendingLearningOperation(
-    String problemId,
-    Map<String, dynamic> operation,
-  ) async {
-    final prefs = await SharedPreferences.getInstance();
-    final existing = await _loadPendingLearningOperations(prefs, problemId);
-    existing.add(operation);
-    await _savePendingLearningOperations(prefs, problemId, existing);
   }
 
   static Future<bool> _syncPendingLearningRecord(
@@ -653,17 +528,12 @@ class SimpleDataManager {
     );
     if (!success) return false;
 
-    await _savePendingLearningOperations(
+    await _saveLocalLearningRecord(
       prefs,
       problemId,
-      const [],
-      notify: false,
+      mergedRecord,
+      notify: true,
     );
-    _learningDataCache[problemId] = Map<String, dynamic>.from(mergedRecord);
-    _learningHistoryCache[problemId] = List<Map<String, dynamic>>.from(
-      mergedHistory,
-    );
-    _notifyLearningDataChanged();
     return true;
   }
 
@@ -791,6 +661,84 @@ class SimpleDataManager {
     }
   }
 
+  static DateTime? _pendingOperationTime(Map<String, dynamic>? operation) =>
+      _tryParseDateTime(operation?['updatedAt']);
+
+  static DateTime? _mapSettingTime(Map<String, dynamic>? map) =>
+      _tryParseDateTime(map?['lastUpdated'] ?? map?['updatedAt']);
+
+  /// 端末(pending)とクラウドのうち updatedAt が新しい方だけ採用する
+  static bool _isPendingNewerThanCloud({
+    required Map<String, dynamic>? pending,
+    required DateTime? cloudUpdatedAt,
+  }) {
+    if (pending == null) return false;
+    final pendingTime = _pendingOperationTime(pending);
+    if (cloudUpdatedAt == null) return true;
+    if (pendingTime == null) return false;
+    return pendingTime.isAfter(cloudUpdatedAt);
+  }
+
+  static Map<String, dynamic> _pickLatestGachaSettings({
+    Map<String, dynamic>? cloud,
+    required Map<String, dynamic>? pending,
+  }) {
+    final defaults = _getDefaultGachaSettings();
+    if (pending == null) {
+      return cloud == null
+          ? Map<String, dynamic>.from(defaults)
+          : (defaults..addAll(cloud));
+    }
+
+    final cloudTime = _mapSettingTime(cloud);
+    if (!_isPendingNewerThanCloud(pending: pending, cloudUpdatedAt: cloudTime)) {
+      return cloud == null
+          ? Map<String, dynamic>.from(defaults)
+          : (defaults..addAll(cloud));
+    }
+
+    final resolved = _applyPendingSettingOperation(defaults, pending);
+    final out = Map<String, dynamic>.from(defaults);
+    if (resolved is Map) {
+      out.addAll(Map<String, dynamic>.from(resolved));
+    }
+    return out;
+  }
+
+  static Map<String, dynamic> _pickLatestUserSettings({
+    Map<String, dynamic>? cloud,
+    required Map<String, dynamic>? pending,
+  }) {
+    if (pending == null) {
+      return cloud == null ? <String, dynamic>{} : Map<String, dynamic>.from(cloud);
+    }
+
+    final cloudTime = _mapSettingTime(cloud);
+    if (!_isPendingNewerThanCloud(pending: pending, cloudUpdatedAt: cloudTime)) {
+      return cloud == null ? <String, dynamic>{} : Map<String, dynamic>.from(cloud);
+    }
+
+    final resolved = _applyPendingSettingOperation(const {}, pending);
+    return resolved is Map
+        ? Map<String, dynamic>.from(resolved)
+        : <String, dynamic>{};
+  }
+
+  static dynamic _pickLatestOtherSetting({
+    required dynamic cloudValue,
+    required DateTime? cloudUpdatedAt,
+    required Map<String, dynamic>? pending,
+  }) {
+    if (pending == null) return _cloneJsonValue(cloudValue);
+    if (!_isPendingNewerThanCloud(
+      pending: pending,
+      cloudUpdatedAt: cloudUpdatedAt,
+    )) {
+      return _cloneJsonValue(cloudValue);
+    }
+    return _applyPendingSettingOperation(null, pending);
+  }
+
   static Future<Map<String, dynamic>?> _loadLegacyGachaSettingsOperation(
     SharedPreferences prefs,
     String gachaType,
@@ -886,14 +834,7 @@ class SimpleDataManager {
       }
     }
 
-    final resolvedRaw = _applyPendingSettingOperation(
-      cloudData ?? _getDefaultGachaSettings(),
-      pending,
-    );
-    final resolved = _getDefaultGachaSettings();
-    if (resolvedRaw is Map) {
-      resolved.addAll(Map<String, dynamic>.from(resolvedRaw));
-    }
+    final resolved = _pickLatestGachaSettings(cloud: cloudData, pending: pending);
     if (canUseCache) {
       _gachaSettingsCache[gachaType] = Map<String, dynamic>.from(resolved);
     }
@@ -923,10 +864,7 @@ class SimpleDataManager {
       }
     }
 
-    final resolvedRaw = _applyPendingSettingOperation(cloudData ?? const {}, pending);
-    final resolved = resolvedRaw is Map
-        ? Map<String, dynamic>.from(resolvedRaw)
-        : <String, dynamic>{};
+    final resolved = _pickLatestUserSettings(cloud: cloudData, pending: pending);
     if (canUseCache) {
       _userSettingsCache = Map<String, dynamic>.from(resolved);
     }
@@ -954,6 +892,7 @@ class SimpleDataManager {
     );
 
     dynamic cloudValue;
+    DateTime? cloudUpdatedAt;
     final userId = FirebaseAuthService.userId;
     if (FirebaseAuthService.isAuthenticated && userId != null) {
       try {
@@ -961,12 +900,21 @@ class SimpleDataManager {
           userId: userId,
           key: key,
         );
+        cloudUpdatedAt = await FirestoreSettingsService.getOtherSettingUpdatedAt(
+          userId: userId,
+          key: key,
+        );
       } catch (_) {
         cloudValue = null;
+        cloudUpdatedAt = null;
       }
     }
 
-    final resolved = _applyPendingSettingOperation(cloudValue, pending);
+    final resolved = _pickLatestOtherSetting(
+      cloudValue: cloudValue,
+      cloudUpdatedAt: cloudUpdatedAt,
+      pending: pending,
+    );
     if (canUseCache) {
       _otherSettingsCache[key] = _cloneJsonValue(resolved);
     }
@@ -985,14 +933,13 @@ class SimpleDataManager {
     );
     if (pending == null) return false;
 
-    final resolvedRaw = _applyPendingSettingOperation(
-      _getDefaultGachaSettings(),
-      pending,
-    );
-    final settings = _getDefaultGachaSettings();
-    if (resolvedRaw is Map) {
-      settings.addAll(Map<String, dynamic>.from(resolvedRaw));
+    Map<String, dynamic>? cloud;
+    try {
+      cloud = await _fetchCloudGachaSettings(userId, gachaType);
+    } catch (_) {
+      cloud = null;
     }
+    final settings = _pickLatestGachaSettings(cloud: cloud, pending: pending);
     final success = await FirestoreSettingsService.saveGachaSettings(
       userId: userId,
       gachaType: gachaType,
@@ -1021,10 +968,13 @@ class SimpleDataManager {
     );
     if (pending == null) return false;
 
-    final resolvedRaw = _applyPendingSettingOperation(const {}, pending);
-    final settings = resolvedRaw is Map
-        ? Map<String, dynamic>.from(resolvedRaw)
-        : <String, dynamic>{};
+    Map<String, dynamic>? cloud;
+    try {
+      cloud = await FirestoreSettingsService.getUserSettings(userId: userId);
+    } catch (_) {
+      cloud = null;
+    }
+    final settings = _pickLatestUserSettings(cloud: cloud, pending: pending);
     final success = await FirestoreSettingsService.saveUserSettings(
       userId: userId,
       settings: settings,
@@ -1058,7 +1008,26 @@ class SimpleDataManager {
     );
     if (pending == null) return false;
 
-    final value = _applyPendingSettingOperation(null, pending);
+    dynamic cloudValue;
+    DateTime? cloudUpdatedAt;
+    try {
+      cloudValue = await FirestoreSettingsService.getOtherSetting(
+        userId: userId,
+        key: key,
+      );
+      cloudUpdatedAt = await FirestoreSettingsService.getOtherSettingUpdatedAt(
+        userId: userId,
+        key: key,
+      );
+    } catch (_) {
+      cloudValue = null;
+      cloudUpdatedAt = null;
+    }
+    final value = _pickLatestOtherSetting(
+      cloudValue: cloudValue,
+      cloudUpdatedAt: cloudUpdatedAt,
+      pending: pending,
+    );
     final success = await FirestoreSettingsService.saveOtherSetting(
       userId: userId,
       key: key,
@@ -1168,6 +1137,10 @@ class SimpleDataManager {
         AppLogger.success('SimpleDataManagerの初期化が完了しました');
       }
 
+      // 旧ランキング用イベントキュー（削除済み機能）の残骸を掃除
+      await prefs.remove('$_namespace/unit_gacha_attempt_events_queue_v1');
+      await prefs.remove('$_namespace/unit_gacha_attempt_events_last_sync_v1');
+
       // 認証済みユーザーの場合、未同期データがあればクラウドへ反映する
       if (FirebaseAuthService.isAuthenticated) {
         await Future.wait([
@@ -1181,271 +1154,6 @@ class SimpleDataManager {
       AppLogger.error('SimpleDataManagerの初期化に失敗しました', error: e);
       return false;
     }
-  }
-
-  // ============================================================================
-  // unit_gacha attempt events (ranking source of truth)
-  // ============================================================================
-
-  static Future<int> getUnitGachaAttemptQueueLength() async {
-    final prefs = await SharedPreferences.getInstance();
-    final q = await _loadUnitGachaAttemptQueue(prefs);
-    return q.length;
-  }
-
-  static Future<UnitGachaAttemptSyncResult?>
-  loadLastUnitGachaAttemptSyncResult() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_unitGachaAttemptLastSyncKey);
-    if (raw == null || raw.isEmpty) return null;
-    try {
-      final decoded = json.decode(raw);
-      if (decoded is Map) {
-        final r = UnitGachaAttemptSyncResult.fromJson(
-          Map<String, dynamic>.from(decoded),
-        );
-        _lastUnitGachaAttemptSyncResult = r;
-        return r;
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  static UnitGachaAttemptSyncResult? _decodeLastUnitGachaAttemptSyncResult(
-    String? raw,
-  ) {
-    if (raw == null || raw.isEmpty) return null;
-    try {
-      final decoded = json.decode(raw);
-      if (decoded is Map) {
-        return UnitGachaAttemptSyncResult.fromJson(
-          Map<String, dynamic>.from(decoded),
-        );
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  /// 電卓Enter由来の解答イベントをローカルキューに追加する。
-  /// - オフライン/未ログイン時でも溜められる
-  /// - ログイン後に syncUnitGachaAttemptEventsToFirestore() でまとめてアップロード
-  static Future<void> enqueueUnitGachaAttemptEvent({
-    required String problemId,
-    required bool isCorrect,
-  }) async {
-    final status = isCorrect ? 'solved' : 'failed';
-    final clientTime = DateTime.now().toIso8601String();
-    final eventId = _buildStableAttemptEventId(
-      problemId: problemId,
-      clientTimeIso: clientTime,
-    );
-
-    final prefs = await SharedPreferences.getInstance();
-    final q = await _loadUnitGachaAttemptQueue(prefs);
-
-    // 重複防止（同じeventIdが既にあれば追加しない）
-    final exists = q.any((e) => e['eventId'] == eventId);
-    if (!exists) {
-      q.add({
-        'eventId': eventId,
-        'problemId': problemId,
-        'status': status,
-        'clientTime': clientTime,
-      });
-    }
-
-    // キュー肥大化の防止（古いものから捨てる）
-    if (q.length > _unitGachaAttemptQueueMax) {
-      q.removeRange(0, q.length - _unitGachaAttemptQueueMax);
-    }
-
-    await _saveUnitGachaAttemptQueue(prefs, q);
-
-    // ログイン済みなら、その場で送信も試す（失敗してもキューに残る）
-    if (FirebaseAuthService.isAuthenticated) {
-      unawaited(syncUnitGachaAttemptEventsToFirestore().then((_) {}));
-    }
-  }
-
-  static String _buildStableAttemptEventId({
-    required String problemId,
-    required String clientTimeIso,
-  }) {
-    // Firestore docIdとして安全な形に寄せる（スラッシュ等を潰す）
-    final safeProblemId = problemId.replaceAll('/', '_');
-    final safeTime = clientTimeIso.replaceAll(':', '').replaceAll('.', '');
-    return 'u_${safeProblemId}_$safeTime';
-  }
-
-  static Future<List<Map<String, dynamic>>> _loadUnitGachaAttemptQueue(
-    SharedPreferences prefs,
-  ) async {
-    final cached = _unitGachaAttemptQueueCache;
-    if (cached != null) return List<Map<String, dynamic>>.from(cached);
-
-    final raw = prefs.getString(_unitGachaAttemptQueueKey);
-    if (raw == null || raw.isEmpty) {
-      _unitGachaAttemptQueueCache = <Map<String, dynamic>>[];
-      return <Map<String, dynamic>>[];
-    }
-    try {
-      final decoded = json.decode(raw);
-      if (decoded is List) {
-        final q = decoded
-            .whereType<Map>()
-            .map((m) => Map<String, dynamic>.from(m))
-            .toList();
-        _unitGachaAttemptQueueCache = q;
-        return List<Map<String, dynamic>>.from(q);
-      }
-    } catch (_) {}
-    _unitGachaAttemptQueueCache = <Map<String, dynamic>>[];
-    return <Map<String, dynamic>>[];
-  }
-
-  static Future<void> _saveUnitGachaAttemptQueue(
-    SharedPreferences prefs,
-    List<Map<String, dynamic>> queue,
-  ) async {
-    _unitGachaAttemptQueueCache = List<Map<String, dynamic>>.from(queue);
-    await prefs.setString(_unitGachaAttemptQueueKey, json.encode(queue));
-  }
-
-  /// ローカルに溜まった unit_gacha の解答イベントをFirestoreへ送る。
-  /// - 送信成功したものだけキューから削除
-  /// - permission系エラーが出る場合は早期終了（再試行しても無駄なので）
-  static Future<UnitGachaAttemptSyncResult>
-  syncUnitGachaAttemptEventsToFirestore() async {
-    if (!FirebaseAuthService.isAuthenticated) {
-      final r = UnitGachaAttemptSyncResult(
-        attempted: 0,
-        sent: 0,
-        remaining: 0,
-        lastErrorKind: AttemptEventUpsertErrorKind.unauthenticated,
-        lastErrorCode: 'unauthenticated',
-        ranAtIso: DateTime.now().toIso8601String(),
-      );
-      _lastUnitGachaAttemptSyncResult = r;
-      return r;
-    }
-    final userId = FirebaseAuthService.userId;
-    if (userId == null) {
-      final r = UnitGachaAttemptSyncResult(
-        attempted: 0,
-        sent: 0,
-        remaining: 0,
-        lastErrorKind: AttemptEventUpsertErrorKind.unauthenticated,
-        lastErrorCode: 'userId_null',
-        ranAtIso: DateTime.now().toIso8601String(),
-      );
-      _lastUnitGachaAttemptSyncResult = r;
-      return r;
-    }
-
-    final prefs = await SharedPreferences.getInstance();
-    final queue = await _loadUnitGachaAttemptQueue(prefs);
-    if (queue.isEmpty) {
-      // IMPORTANT: Do not overwrite the last successful/failed sync result with zeros.
-      // Queue can be empty simply because events were already uploaded (or never enqueued).
-      final prev = _decodeLastUnitGachaAttemptSyncResult(
-        prefs.getString(_unitGachaAttemptLastSyncKey),
-      );
-      if (prev != null) {
-        _lastUnitGachaAttemptSyncResult = prev;
-        return prev;
-      }
-      final r = UnitGachaAttemptSyncResult(
-        attempted: 0,
-        sent: 0,
-        remaining: 0,
-        ranAtIso: DateTime.now().toIso8601String(),
-      );
-      _lastUnitGachaAttemptSyncResult = r;
-      // First-time only: persist so UI has something to show next boot.
-      await _saveLastUnitGachaAttemptSyncResult(prefs, r);
-      return r;
-    }
-
-    return await _withCloudSyncIndicator(() async {
-      final remaining = <Map<String, dynamic>>[];
-      bool hasPermissionError = false;
-      int attempted = 0;
-      int sent = 0;
-      AttemptEventUpsertErrorKind? lastErrorKind;
-      String? lastErrorCode;
-
-      for (final e in queue) {
-        if (hasPermissionError) {
-          remaining.add(e);
-          continue;
-        }
-        final eventId = e['eventId'] as String?;
-        final problemId = e['problemId'] as String?;
-        final status = e['status'] as String?;
-        final clientTime = e['clientTime'] as String?;
-
-        if (eventId == null ||
-            problemId == null ||
-            status == null ||
-            clientTime == null) {
-          continue; // 壊れたレコードは捨てる
-        }
-        if (status != 'solved' && status != 'failed') {
-          continue;
-        }
-
-        try {
-          attempted += 1;
-          final res = await FirestoreAttemptEventService.upsertAttemptEvent(
-            userId: userId,
-            eventId: eventId,
-            problemId: problemId,
-            status: status,
-            clientTimeIso: clientTime,
-          );
-          if (res.ok) {
-            sent += 1;
-          } else {
-            lastErrorKind = res.errorKind;
-            lastErrorCode = res.errorCode;
-            if (res.errorKind == AttemptEventUpsertErrorKind.permissionDenied) {
-              hasPermissionError = true;
-            }
-            remaining.add(e);
-          }
-        } catch (err) {
-          // Should be rare; upsertAttemptEvent already classifies errors.
-          lastErrorKind = AttemptEventUpsertErrorKind.unknown;
-          lastErrorCode = 'thrown';
-          remaining.add(e);
-        }
-      }
-
-      await _saveUnitGachaAttemptQueue(prefs, remaining);
-      final r = UnitGachaAttemptSyncResult(
-        attempted: attempted,
-        sent: sent,
-        remaining: remaining.length,
-        lastErrorKind: lastErrorKind,
-        lastErrorCode: lastErrorCode,
-        ranAtIso: DateTime.now().toIso8601String(),
-      );
-      _lastUnitGachaAttemptSyncResult = r;
-      await _saveLastUnitGachaAttemptSyncResult(prefs, r);
-      return r;
-    });
-  }
-
-  static Future<void> _saveLastUnitGachaAttemptSyncResult(
-    SharedPreferences prefs,
-    UnitGachaAttemptSyncResult r,
-  ) async {
-    try {
-      await prefs.setString(
-        _unitGachaAttemptLastSyncKey,
-        json.encode(r.toJson()),
-      );
-    } catch (_) {}
   }
 
   /// ローカル設定をFirestoreに同期（認証時に呼び出す）
@@ -1515,6 +1223,56 @@ class SimpleDataManager {
     }
   }
 
+  /// 端末内の学習記録をクラウドへマージして保存（ログイン・アカウント切替時）
+  static Future<void> _pushLocalLearningRecordsToFirestore(
+    SharedPreferences prefs,
+    String userId,
+  ) async {
+    final prefix = '$_namespace/learning/';
+    var changed = false;
+
+    for (final key in prefs.getKeys()) {
+      if (!key.startsWith(prefix)) continue;
+      final problemId = key.substring(prefix.length);
+      try {
+        final local = await _loadLocalLearningRecord(prefs, problemId);
+        final localHistory =
+            local['history'] as List<Map<String, dynamic>>? ?? const [];
+        if (localHistory.isEmpty) continue;
+
+        final cloudData = await _fetchCloudLearningRecord(userId, problemId);
+        final cloudHistory =
+            cloudData?['history'] as List<Map<String, dynamic>>? ?? const [];
+        final mergedRecord = _buildLearningRecordData(
+          problemId: problemId,
+          history: _mergeHistoryLists(localHistory, cloudHistory),
+          fallbackUpdatedAt:
+              cloudData?['lastUpdated'] as String? ??
+              local['lastUpdated'] as String?,
+        );
+
+        final success = await FirestoreLearningService.saveLearningRecord(
+          userId: userId,
+          problemId: problemId,
+          data: mergedRecord,
+        );
+        if (!success) continue;
+
+        await _saveLocalLearningRecord(
+          prefs,
+          problemId,
+          mergedRecord,
+          notify: false,
+        );
+        changed = true;
+      } catch (e) {
+        print('Error pushing local learning record $problemId: $e');
+      }
+    }
+
+    if (changed) _notifyLearningDataChanged();
+  }
+
   /// ローカルデータをFirestoreに同期（認証時に呼び出す）
   static Future<void> syncLocalDataToFirestore() async {
     try {
@@ -1530,8 +1288,11 @@ class SimpleDataManager {
       }
 
       await _withCloudSyncIndicator(() async {
-        print('Starting pending learning log sync for user: $userId');
+        print('Starting local learning sync for user: $userId');
         final prefs = await SharedPreferences.getInstance();
+        await _pushLocalLearningRecordsToFirestore(prefs, userId);
+
+        print('Starting pending learning log sync for user: $userId');
         final pendingProblemIds =
             prefs
                 .getKeys()
@@ -1551,8 +1312,6 @@ class SimpleDataManager {
             print('Error syncing pending learning record $problemId: $e');
           }
         }
-        // 解答イベント（ランキング用）も同期
-        await syncUnitGachaAttemptEventsToFirestore();
       });
     } catch (e) {
       print('Error syncing local data to Firestore: $e');
@@ -1577,26 +1336,35 @@ class SimpleDataManager {
           : 'none';
       if (statusKey == 'none') return true;
 
+      final prefs = await SharedPreferences.getInstance();
       final nowIso = DateTime.now().toIso8601String();
-      await _enqueuePendingLearningOperation(problem.id, {
-        'kind': 'append',
+      final local = await _loadLocalLearningRecord(prefs, problem.id);
+      final history = List<Map<String, dynamic>>.from(
+        _normalizeHistoryList(
+          local['history'],
+          maxEntries: learningHistoryRetentionCount,
+        ),
+      );
+      history.add({
+        'status': statusKey,
+        'time': nowIso,
         'updatedAt': nowIso,
-        'log': {
-          'status': statusKey,
-          'time': nowIso,
-          'updatedAt': nowIso,
-          if (byCalculator) 'byCalculator': true,
-        },
+        if (byCalculator) 'byCalculator': true,
       });
+      final next = _buildLearningRecordData(
+        problemId: problem.id,
+        history: history,
+      );
+      await _saveLocalLearningRecord(prefs, problem.id, next);
 
       if (FirebaseAuthService.isAuthenticated) {
         final userId = FirebaseAuthService.userId;
         if (userId != null) {
           try {
-            final prefs = await SharedPreferences.getInstance();
-            await _syncPendingLearningRecord(prefs, userId, problem.id);
-            print(
-              'Successfully synced learning record for problem ${problem.id}',
+            await FirestoreLearningService.saveLearningRecord(
+              userId: userId,
+              problemId: problem.id,
+              data: next,
             );
           } catch (e, stackTrace) {
             print('Error saving to Firestore (continuing with local save): $e');
@@ -1646,9 +1414,8 @@ class SimpleDataManager {
   static Future<List<Map<String, dynamic>>> _getLearningHistoryForProblemId(
     String problemId,
   ) async {
-    final canUseCache = !FirebaseAuthService.isAuthenticated;
     final cached = _learningHistoryCache[problemId];
-    if (canUseCache && cached != null) return cached;
+    if (cached != null) return cached;
 
     final data = await _resolveDisplayLearningData(problemId);
     final history = _normalizeHistoryList(
@@ -1667,7 +1434,7 @@ class SimpleDataManager {
           newStatus = 'solved';
           break;
         case 'understood':
-          newStatus = 'understood';
+          newStatus = 'solved';
           break;
         case 'failed':
           newStatus = 'failed';
@@ -1687,35 +1454,8 @@ class SimpleDataManager {
       return out;
     }).toList();
 
-    if (canUseCache) {
-      _learningHistoryCache[problemId] = migratedHistory;
-    }
+    _learningHistoryCache[problemId] = migratedHistory;
     return migratedHistory;
-  }
-
-  /// 複数問題の履歴を一括取得（SharedPreferencesアクセス回数を最小化）
-  ///
-  /// - 問題一覧で大量にgetLearningHistoryを呼ぶと重くなるため、先にまとめて読み込む。
-  /// - Firestore同期は行わない（UIをブロックしないため）。
-  static Future<Map<String, List<Map<String, dynamic>>>> getLearningHistoryMap(
-    Iterable<String> problemIds,
-  ) async {
-    final ids = problemIds.toSet();
-    if (ids.isEmpty) return {};
-    final out = <String, List<Map<String, dynamic>>>{};
-
-    for (final id in ids) {
-      final cached = _learningHistoryCache[id];
-      if (cached != null) {
-        out[id] = cached;
-        continue;
-      }
-
-      final history = await _getLearningHistoryForProblemId(id);
-      out[id] = history;
-    }
-
-    return out;
   }
 
   /// 学習記録の履歴を保存
@@ -1728,34 +1468,29 @@ class SimpleDataManager {
         history,
         maxEntries: learningHistoryRetentionCount,
       );
-      final nowIso = DateTime.now().toIso8601String();
-      await _enqueuePendingLearningOperation(problem.id, {
-        'kind': 'replace',
-        'updatedAt': nowIso,
-        'history': normalizedHistory,
-      });
+      final prefs = await SharedPreferences.getInstance();
+      final next = _buildLearningRecordData(
+        problemId: problem.id,
+        history: normalizedHistory,
+      );
+      await _saveLocalLearningRecord(prefs, problem.id, next);
 
       if (FirebaseAuthService.isAuthenticated) {
         final userId = FirebaseAuthService.userId;
         if (userId != null) {
           try {
-            final prefs = await SharedPreferences.getInstance();
-            await _syncPendingLearningRecord(prefs, userId, problem.id);
-            print(
-              'Successfully saved learning history for problem ${problem.id}',
+            await FirestoreLearningService.saveLearningRecord(
+              userId: userId,
+              problemId: problem.id,
+              data: next,
             );
           } catch (e, stackTrace) {
             print(
               'Error saving history to Firestore (continuing with local save): $e',
             );
             print('Stack trace: $stackTrace');
-            // Firestoreエラー時はローカルのみで動作継続
           }
-        } else {
-          print('Warning: User ID is null, skipping Firestore sync');
         }
-      } else {
-        print('User not authenticated, skipping Firestore sync');
       }
 
       return true;
@@ -1778,17 +1513,21 @@ class SimpleDataManager {
   /// 空の履歴をローカルとクラウドへ保存し、次回同期で古い記録が復活しないようにする
   static Future<bool> clearLearningHistory(dynamic problem) async {
     try {
-      final nowIso = DateTime.now().toIso8601String();
-      await _enqueuePendingLearningOperation(problem.id, {
-        'kind': 'clear',
-        'updatedAt': nowIso,
-      });
+      final prefs = await SharedPreferences.getInstance();
+      final empty = _buildLearningRecordData(
+        problemId: problem.id,
+        history: const [],
+      );
+      await _saveLocalLearningRecord(prefs, problem.id, empty);
 
       if (FirebaseAuthService.isAuthenticated) {
         final userId = FirebaseAuthService.userId;
         if (userId != null) {
-          final prefs = await SharedPreferences.getInstance();
-          await _syncPendingLearningRecord(prefs, userId, problem.id);
+          await FirestoreLearningService.saveLearningRecord(
+            userId: userId,
+            problemId: problem.id,
+            data: empty,
+          );
         }
       }
       print('Successfully cleared learning history for problem ${problem.id}');
@@ -2029,87 +1768,6 @@ class SimpleDataManager {
     }
   }
 
-  /// アカウント固有のローカルデータをクリア（学習記録、設定など）
-  /// バージョン情報や移行フラグは保持
-  static Future<bool> clearAccountSpecificData() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final allKeys = prefs.getKeys();
-
-      // クリアするキーのパターン
-      final patternsToClear = [
-        '$_namespace/learning/', // 学習記録
-        '$_namespace/gacha/', // ガチャ設定
-        '$_namespace/user_settings', // ユーザー設定
-        '$_namespace/firestore_sync_completed_', // 同期完了フラグ
-      ];
-
-      // 保持するキー（バージョン情報、最後のユーザーID）
-      final keysToKeep = [_versionKey, _lastUserIdKey];
-
-      int clearedCount = 0;
-
-      for (final key in allKeys) {
-        // 保持するキーはスキップ
-        if (keysToKeep.contains(key)) {
-          continue;
-        }
-
-        // クリア対象のパターンに一致するキーを削除
-        bool shouldClear = false;
-        for (final pattern in patternsToClear) {
-          if (key.startsWith(pattern)) {
-            shouldClear = true;
-            break;
-          }
-        }
-
-        // その他の設定キーもクリア（integral_gacha_exclusion_modeなど）
-        if (!shouldClear && key.startsWith(_namespace)) {
-          // 名前空間内のその他のキーもクリア（ただし、保持するキーは除く）
-          if (!keysToKeep.contains(key)) {
-            shouldClear = true;
-          }
-        }
-
-        if (shouldClear) {
-          await prefs.remove(key);
-          clearedCount++;
-        }
-      }
-
-      _invalidateLearningCaches();
-      _invalidateSettingsCaches();
-      print('Cleared $clearedCount account-specific data keys');
-      return true;
-    } catch (e) {
-      print('Error clearing account-specific data: $e');
-      return false;
-    }
-  }
-
-  /// アカウント切り替え時のデータ同期処理
-  /// 前のアカウントの pending ローカルデータをクリアし、新しいアカウントへ持ち越さない
-  static Future<void> syncOnAccountSwitch() async {
-    try {
-      final currentUserId = FirebaseAuthService.userId;
-      if (currentUserId == null) {
-        print('No current user, skipping account switch sync');
-        return;
-      }
-      await _withCloudSyncIndicator(() async {
-        // 前アカウントのローカルデータを新アカウントへ混ぜない
-        await clearAccountSpecificData();
-        // 現在のユーザーIDを保存
-        await setLastUserId(currentUserId);
-      });
-
-      print('Account switch sync completed');
-    } catch (e) {
-      print('Error in account switch sync: $e');
-    }
-  }
-
   // ============================================================================
   // 無料で履歴管理可能なガチャ選択機能
   // ============================================================================
@@ -2190,13 +1848,8 @@ class SimpleDataManager {
     return true;
   }
 
-  /// 学習履歴オプションの購入状態を確認（RevenueCatServiceのラッパー）
+  /// 学習履歴オプションの購入状態。現状は常に利用可能として扱う。
   static Future<bool> isLearningHistoryOptionPurchased() async {
-    try {
-      return await RevenueCatService.isLearningHistoryOptionPurchased();
-    } catch (e) {
-      print('Error checking learning history option purchase: $e');
-      return false;
-    }
+    return true;
   }
 }

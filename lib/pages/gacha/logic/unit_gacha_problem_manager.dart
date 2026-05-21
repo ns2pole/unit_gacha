@@ -132,14 +132,8 @@ class UnitGachaProblemManager {
     return false;
   }
 
-  /// 全問題数を取得（カテゴリーフィルタリング後の実際の問題数）
-  /// 実際の問題数（同じexprとmeaningを持つUnitProblemの数を合計）を返す
+  /// 全問題数を取得（カテゴリーフィルタリング後の UnitExprProblem 件数）
   int getTotalProblemCount(Set<UnitCategory> selectedCategories) {
-    final filtered = _filterByCategories(unitExprProblems, selectedCategories);
-    var total = 0;
-    for (final ep in filtered) {
-      total += ep.unitProblems.length;
-    }
-    return total;
+    return _filterByCategories(unitExprProblems, selectedCategories).length;
   }
 }

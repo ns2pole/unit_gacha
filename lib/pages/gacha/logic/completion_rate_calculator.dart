@@ -1,13 +1,11 @@
 // lib/pages/gacha/logic/completion_rate_calculator.dart
 // 達成率計算ヘルパー
 
-import '../../../problems/unit/symbol.dart' show UnitCategory, UnitProblem;
-import '../../../problems/unit/problems.dart' show unitGachaItems;
-import '../../../services/problems/simple_data_manager.dart';
+import '../../../problems/unit/symbol.dart' show UnitCategory;
+import '../../../problems/unit/problems.dart' show unitExprProblems;
 import '../../../services/problems/exclusion_logic.dart'
-    show ExclusionMode, sortHistoryByTimeNewestFirst;
-import '../pages/gacha_settings_page.dart'
-    show GachaFilterMode, GachaFilterModeConversion;
+    show exclusionModeFromLatestN, isExprProblemFullyExcluded;
+import '../pages/gacha_settings_page.dart' show GachaFilterMode;
 
 /// 達成率計算結果
 class CompletionRateResult {
@@ -81,104 +79,6 @@ class CompletionRateCalculator {
     );
   }
 
-  /// 問題が達成状態かどうかを判定
-  ///
-  /// [problem] 判定する問題
-  /// [gachaFilterMode] フィルタリングモード（達成判定の基準）
-  static Future<bool> _isProblemCompleted(
-    UnitProblem problem,
-    GachaFilterMode gachaFilterMode,
-  ) async {
-    // randomモードの場合は、excludeSolvedGE1と同じロジックを使用
-    if (gachaFilterMode == GachaFilterMode.random) {
-      return await _isProblemCompleted(
-        problem,
-        GachaFilterMode.excludeSolvedGE1,
-      );
-    }
-
-    // 学習履歴を取得
-    final history = await SimpleDataManager.getLearningHistory(problem);
-    if (history.isEmpty) {
-      return false;
-    }
-
-    // 時刻でソート（最新が先頭になるように）
-    final reversed = sortHistoryByTimeNewestFirst(history);
-
-    // 必要な連続solved数を取得
-    final needed = gachaFilterMode == GachaFilterMode.excludeSolvedGE1
-        ? 1
-        : gachaFilterMode == GachaFilterMode.excludeSolvedGE2
-        ? 2
-        : gachaFilterMode == GachaFilterMode.excludeSolvedGE3
-        ? 3
-        : 1;
-
-    // 最新から順に、solvedが連続して何個並んでいるかを数える
-    int count = 0;
-    for (final record in reversed) {
-      final statusStr = record['status'] as String?;
-      if (statusStr == 'solved') {
-        count++;
-      } else if (statusStr != null && statusStr != 'none') {
-        // solved以外のステータスが来たら連続が途切れる
-        break;
-      }
-    }
-
-    // 連続数がneeded以上なら達成
-    return count >= needed;
-  }
-
-  /// 除外判定（exclusion_logic.dartのshouldExcludeByModeと同じロジック）
-  static Future<bool> _shouldExcludeByMode(
-    UnitProblem problem,
-    ExclusionMode exclusionMode,
-  ) async {
-    // 除外モードがnoneの場合は除外しない
-    if (exclusionMode == ExclusionMode.none) {
-      return false;
-    }
-
-    // neededの値を取得
-    final needed = exclusionMode == ExclusionMode.latest1
-        ? 1
-        : exclusionMode == ExclusionMode.latest2
-        ? 2
-        : exclusionMode == ExclusionMode.latest3
-        ? 3
-        : 0;
-
-    if (needed == 0) {
-      return false;
-    }
-
-    // 学習履歴を取得
-    final history = await SimpleDataManager.getLearningHistory(problem);
-    if (history.isEmpty) {
-      return false;
-    }
-
-    // 時刻でソート（最新が先頭になるように）
-    final reversed = sortHistoryByTimeNewestFirst(history);
-
-    // 最新から順に、solvedが連続して何個並んでいるかを数える
-    int count = 0;
-    for (final record in reversed) {
-      final statusStr = record['status'] as String?;
-      if (statusStr == 'solved') {
-        count++;
-      } else if (statusStr != null && statusStr != 'none') {
-        // solved以外のステータスが来たら連続が途切れる
-        break;
-      }
-    }
-
-    // 連続数がneeded以上なら除外
-    return count >= needed;
-  }
-
   /// GachaFilterModeから最新N回分のNを取得
   /// randomの場合は1を返す
   static int getLatestNFromFilterMode(GachaFilterMode gachaFilterMode) {
@@ -200,8 +100,9 @@ class CompletionRateCalculator {
   static Map<UnitCategory, int> getTotalProblemCountsByCategory() {
     final counts = <UnitCategory, int>{};
     for (final category in UnitCategory.values) {
-      counts[category] =
-          unitGachaItems.where((i) => i.exprProblem.category == category).length;
+      counts[category] = unitExprProblems
+          .where((ep) => ep.category == category)
+          .length;
     }
     return counts;
   }
@@ -214,41 +115,18 @@ class CompletionRateCalculator {
     required UnitCategory category,
     required int latestN,
   }) async {
-    // 指定カテゴリーの問題を取得（フィルタリングなし）
-    final categoryProblems = unitGachaItems
-        .where((i) => i.exprProblem.category == category)
-        .map((i) => i.unitProblem)
+    final categoryExprs = unitExprProblems
+        .where((ep) => ep.category == category)
         .toList();
 
-    if (categoryProblems.isEmpty) {
+    if (categoryExprs.isEmpty) {
       return 0;
     }
 
-    int satisfiedCount = 0;
-    for (final problem in categoryProblems) {
-      // 学習履歴を取得
-      final history = await SimpleDataManager.getLearningHistory(problem);
-      if (history.isEmpty) {
-        continue;
-      }
-
-      // 時刻でソート（最新が先頭になるように）
-      final reversed = sortHistoryByTimeNewestFirst(history);
-
-      // 最新から順に、solvedが連続して何個並んでいるかを数える
-      int count = 0;
-      for (final record in reversed) {
-        final statusStr = record['status'] as String?;
-        if (statusStr == 'solved') {
-          count++;
-        } else if (statusStr != null && statusStr != 'none') {
-          // solved以外のステータスが来たら連続が途切れる
-          break;
-        }
-      }
-
-      // 連続数がlatestN以上なら条件を満たす
-      if (count >= latestN) {
+    final exclusionMode = exclusionModeFromLatestN(latestN);
+    var satisfiedCount = 0;
+    for (final ep in categoryExprs) {
+      if (await isExprProblemFullyExcluded(ep, exclusionMode)) {
         satisfiedCount++;
       }
     }

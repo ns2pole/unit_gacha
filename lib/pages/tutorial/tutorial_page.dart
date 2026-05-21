@@ -259,6 +259,7 @@ class _TutorialPageState extends State<TutorialPage> {
       final success = await SimpleDataManager.saveLearningRecord(
         _tutorialMathProblem,
         status,
+        byCalculator: true,
       );
       if (success) {
         debugPrint(

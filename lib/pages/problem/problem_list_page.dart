@@ -11,8 +11,6 @@ import '../../problems/unit/unit_expr_problem.dart';
 import '../../services/problems/exclusion_logic.dart'
     show shouldExcludeByMode, sortHistoryByTimeNewestFirst;
 import '../../services/problems/simple_data_manager.dart';
-import '../../services/payment/problem_access_service.dart';
-import '../../services/payment/revenuecat_service.dart';
 import '../../widgets/home/background_image_widget.dart';
 import '../common/common.dart' show MixedTextMath;
 import '../common/problem_status.dart';
@@ -81,9 +79,23 @@ class ProblemListPage extends StatefulWidget {
 }
 
 class _ProblemListPageState extends State<ProblemListPage> {
-  static const int _slotCount = slotCount; // 3
+  /// 一覧バッジ数・ヘッダ集計は「最新i回」フィルタの i に合わせる（それ以外は [slotCount]）
+  int get _listSlotCount {
+    switch (widget.gachaFilterMode) {
+      case GachaFilterMode.excludeSolvedGE1:
+        return 1;
+      case GachaFilterMode.excludeSolvedGE2:
+        return 2;
+      case GachaFilterMode.excludeSolvedGE3:
+        return 3;
+      case GachaFilterMode.random:
+      case GachaFilterMode.excludeSolved:
+      case GachaFilterMode.onlyUnsolved:
+        return slotCount;
+    }
+  }
 
-  /// UnitProblem.id -> latest3 slots
+  /// UnitProblem.id -> latest N slots（N は [_listSlotCount]）
   final Map<String, List<Map<String, dynamic>>> _slotsCache = {};
 
   /// UnitProblem.id -> whether "point" is expanded in the list UI
@@ -416,7 +428,7 @@ class _ProblemListPageState extends State<ProblemListPage> {
 
   String _aggKey() {
     final cats = widget.selectedCategories.map((c) => c.name).toList()..sort();
-    return '${cats.join(",")}|${widget.gachaFilterMode.name}';
+    return '${cats.join(",")}|${widget.gachaFilterMode.name}|n=$_listSlotCount';
   }
 
   String? _lastAggKey;
@@ -454,6 +466,18 @@ class _ProblemListPageState extends State<ProblemListPage> {
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant ProblemListPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.gachaFilterMode != widget.gachaFilterMode) {
+      _slotsCache.clear();
+      _lastAggKey = null;
+      _aggFuture = null;
+      _lastVisibleAggKey = null;
+      _visibleAggFuture = null;
+    }
+  }
+
   ProblemStatus _parseStatusFromHistory(Map<String, dynamic> h) {
     return ProblemStatus.values.firstWhere(
       (s) => s.name == (h['status'] as String? ?? 'none'),
@@ -482,12 +506,13 @@ class _ProblemListPageState extends State<ProblemListPage> {
     if (cached != null) return cached;
 
     final history = await SimpleDataManager.getLearningHistory(p);
-    final latestHistory = history.length > _slotCount
-        ? sortHistoryByTimeNewestFirst(history).take(_slotCount).toList()
-        : history;
+    final n = _listSlotCount;
+    final latestHistory = history.length > n
+        ? sortHistoryByTimeNewestFirst(history).take(n).toList()
+        : sortHistoryByTimeNewestFirst(history);
 
     final slots = <Map<String, dynamic>>[];
-    for (var i = 0; i < _slotCount; i++) {
+    for (var i = 0; i < n; i++) {
       if (i < latestHistory.length) {
         final h = latestHistory[i];
         slots.add({
@@ -721,8 +746,9 @@ class _ProblemListPageState extends State<ProblemListPage> {
   List<Map<String, dynamic>> _buildCurrentSlotsFromHistory(
     List<Map<String, dynamic>> history,
   ) {
+    // 手動編集の保存形式は従来どおり最大 [slotCount] スロット分（一覧表示の N とは独立）
     final current = <Map<String, dynamic>>[];
-    for (var i = 0; i < _slotCount; i++) {
+    for (var i = 0; i < slotCount; i++) {
       if (i < history.length) {
         final h = history[i];
         final byCalc = h['byCalculator'];
@@ -1097,7 +1123,7 @@ class _ProblemListPageState extends State<ProblemListPage> {
                     ),
                   )
                 else ...[
-                  ...slots.take(_slotCount).toList().asMap().entries.map((
+                  ...slots.take(_listSlotCount).toList().asMap().entries.map((
                     slotEntry,
                   ) {
                     final idx = slotEntry.key;
@@ -1144,7 +1170,8 @@ class _ProblemListPageState extends State<ProblemListPage> {
                   Builder(
                     builder: (context) {
                       DateTime? latestTime;
-                      for (int i = slots.length - 1; i >= 0; i--) {
+                      // slots[0] is newest (see _getSlots)
+                      for (int i = 0; i < slots.length; i++) {
                         final st = slots[i]['status'] as ProblemStatus?;
                         if (st != null && st != ProblemStatus.none) {
                           final time = slots[i]['time'] as DateTime?;
@@ -1237,108 +1264,6 @@ class _ProblemListPageState extends State<ProblemListPage> {
     );
   }
 
-  Future<void> _showPurchaseDialog({required String productId}) async {
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        final l10n = AppLocalizations.of(dialogContext);
-        bool busy = false;
-        return StatefulBuilder(
-          builder: (context, setLocalState) {
-            Future<void> run(Future<void> Function() fn) async {
-              if (busy) return;
-              setLocalState(() => busy = true);
-              try {
-                await fn();
-              } finally {
-                if (context.mounted) setLocalState(() => busy = false);
-              }
-            }
-
-            return AlertDialog(
-              content: Text(
-                l10n.purchaseDialogBody,
-                style: const TextStyle(height: 1.4),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: busy
-                      ? null
-                      : () => Navigator.of(dialogContext).pop(),
-                  child: Text(l10n.cancel),
-                ),
-                TextButton(
-                  onPressed: busy
-                      ? null
-                      : () {
-                          run(() async {
-                            final ok =
-                                await RevenueCatService.restorePurchases();
-                            ProblemAccessService.clearCache();
-                            if (!mounted) return;
-                            Navigator.of(dialogContext).pop();
-                            ScaffoldMessenger.of(this.context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  ok
-                                      ? l10n.purchaseRestored
-                                      : l10n.noPurchasesFound,
-                                ),
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                            setState(() {});
-                          });
-                        },
-                  child: busy
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(l10n.restore),
-                ),
-                TextButton(
-                  onPressed: busy
-                      ? null
-                      : () {
-                          run(() async {
-                            final res = await RevenueCatService.purchaseProduct(
-                              productId,
-                            );
-                            ProblemAccessService.clearCache();
-                            if (!mounted) return;
-                            Navigator.of(dialogContext).pop();
-                            if (!res.success && res.cancelled) {
-                              return;
-                            }
-                            ScaffoldMessenger.of(this.context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  res.success
-                                      ? l10n.purchaseCompleted
-                                      : (res.cancelled
-                                            ? l10n.purchaseCancelled
-                                            : (res.error ??
-                                                  l10n.purchaseFailed)),
-                                ),
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                            setState(() {});
-                          });
-                        },
-                  child: Text(l10n.purchase),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -1410,66 +1335,7 @@ class _ProblemListPageState extends State<ProblemListPage> {
                         itemBuilder: (context, index) {
                           final ep = items[index];
                           final displayNo = index + 1;
-                          final pid = ProblemAccessService.requiredProductIdFor(
-                            ep,
-                          );
-                          if (pid == null || pid.isEmpty) {
-                            return _buildUnitProblemCard(ep, displayNo);
-                          }
-
-                          return FutureBuilder<bool>(
-                            future: ProblemAccessService.isExprProblemUnlocked(
-                              ep,
-                            ),
-                            builder: (context, snapshot) {
-                              final unlocked = snapshot.data == true;
-                              if (unlocked)
-                                return _buildUnitProblemCard(ep, displayNo);
-
-                              final baseCard = _buildUnitProblemCard(
-                                ep,
-                                displayNo,
-                              );
-                              // Keep the normal card layout as-is, and just overlay a subtle grey veil.
-                              final lockedCard = AbsorbPointer(
-                                child: Stack(
-                                  children: [
-                                    baseCard,
-                                    Positioned.fill(
-                                      child: Container(
-                                        color: Colors.grey.withOpacity(0.28),
-                                      ),
-                                    ),
-                                    // Center watermark
-                                    Positioned.fill(
-                                      child: Center(
-                                        child: Icon(
-                                          Icons.lock_outline,
-                                          size: 64,
-                                          color: Colors.black.withOpacity(0.22),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-
-                              return Stack(
-                                children: [
-                                  lockedCard,
-                                  Positioned.fill(
-                                    child: Material(
-                                      color: Colors.transparent,
-                                      child: InkWell(
-                                        onTap: () =>
-                                            _showPurchaseDialog(productId: pid),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          );
+                          return _buildUnitProblemCard(ep, displayNo);
                         },
                       );
                     },

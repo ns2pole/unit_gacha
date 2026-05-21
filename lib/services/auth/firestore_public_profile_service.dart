@@ -62,7 +62,7 @@ class FirestorePublicProfileService {
   /// Background:
   /// - Cloud Functions score updates require `public_profile/unit_gacha.participating == true`.
   /// - Some legacy users can have an overall leaderboard doc but missing/false participation.
-  ///   In that case, new attempt events are ignored and score never increases until the user
+  ///   In that case, new learning history writes are ignored for ranking until the user
   ///   manually toggles OFF→ON.
   ///
   /// This method silently restores participation when we can prove the user was participating

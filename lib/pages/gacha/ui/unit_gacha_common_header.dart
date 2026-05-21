@@ -1,8 +1,8 @@
 // lib/pages/gacha/ui/unit_gacha_common_header.dart
 // ユニットガチャ共通ヘッダーウィジェット
 
-import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../localization/app_localizations.dart';
 import '../../../managers/timer_manager.dart';
 import '../../../widgets/timer/timer_toggle.dart';
@@ -16,6 +16,10 @@ import '../logic/unit_gacha_filter.dart' show UnitGachaFilterHelper;
 class UnitGachaCommonHeader extends StatelessWidget {
   // Home（共通ヘッダー）のアイコンボタンサイズ。縦長に見えないよう少しだけ小さくする。
   static const double _iconButtonSize = 44;
+  /// ? / クラウド行の高さ（Stack がタイトル文字高だけになると左右アイコンが見切れる）
+  static const double _titleRowHeight = 52;
+  static const double _headerTitleFontSize = 31;
+  static const String _headerIconAsset = 'assets/icon-removebg-preview.png';
   final TimerManager timerManager;
   final AppLocalizations l10n;
   final bool isHelpPageVisible;
@@ -113,56 +117,10 @@ class UnitGachaCommonHeader extends StatelessWidget {
               // 1行目：Stackで中央にタイトル、左端に?ボタン、右端にクラウドボタン
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return SizedBox(
-                      width: constraints.maxWidth > 0 ? constraints.maxWidth : double.infinity,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          // 中央：タイトル
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text(
-                                'Unit Gacha',
-                                style: TextStyle(
-                                  fontSize: 36,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF8B7355),
-                                ),
-                              ),
-                            ],
-                          ),
-                          // 左端：?ボタン
-                          Positioned(
-                            left: 0,
-                            child: KeyedSubtree(
-                              key: helpButtonKey,
-                              child: _buildCircleIconButton(
-                                icon: Icons.help_outline,
-                                active: isHelpPageVisible,
-                                tooltip: isHelpPageVisible
-                                    ? l10n.tooltipCloseHelp
-                                    : l10n.tooltipHelp,
-                                onTap: onHelpToggle,
-                              ),
-                            ),
-                          ),
-                          // 右端：クラウドボタン
-                          Positioned(
-                            right: 0,
-                            child: KeyedSubtree(
-                              key: cloudButtonKey,
-                              child: isAuthenticated
-                                  ? _buildCloudMenuButton(context, accountInfo, loginMethod)
-                                  : _buildLoginButton(context),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                child: _buildTitleRow(
+                  isAuthenticated: isAuthenticated,
+                  accountInfo: accountInfo,
+                  loginMethod: loginMethod,
                 ),
               ),
               const SizedBox(height: 10),
@@ -182,51 +140,10 @@ class UnitGachaCommonHeader extends StatelessWidget {
               const SizedBox(height: 4),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return SizedBox(
-                      width: constraints.maxWidth > 0 ? constraints.maxWidth : double.infinity,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          // 中央：タイトル
-                          const Text(
-                            'Unit Gacha',
-                            style: TextStyle(
-                              fontSize: 36,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF8B7355),
-                            ),
-                          ),
-                          // 左端：?ボタン
-                          Positioned(
-                            left: 0,
-                            child: KeyedSubtree(
-                              key: helpButtonKey,
-                              child: _buildCircleIconButton(
-                                icon: Icons.help_outline,
-                                active: isHelpPageVisible,
-                                tooltip: isHelpPageVisible
-                                    ? l10n.tooltipCloseHelp
-                                    : l10n.tooltipHelp,
-                                onTap: onHelpToggle,
-                              ),
-                            ),
-                          ),
-                          // 右端：雲アイコン/ログインボタン
-                          Positioned(
-                            right: 0,
-                            child: KeyedSubtree(
-                              key: cloudButtonKey,
-                              child: isAuthenticated
-                                  ? _buildCloudMenuButton(context, accountInfo, loginMethod)
-                                  : _buildLoginButton(context),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                child: _buildTitleRow(
+                  isAuthenticated: isAuthenticated,
+                  accountInfo: accountInfo,
+                  loginMethod: loginMethod,
                 ),
               ),
               const SizedBox(height: 10),
@@ -240,6 +157,84 @@ class UnitGachaCommonHeader extends StatelessWidget {
           );
         }
       },
+    );
+  }
+
+  Widget _buildTitleRow({
+    required bool isAuthenticated,
+    required String? accountInfo,
+    required String? loginMethod,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SizedBox(
+          width: constraints.maxWidth > 0 ? constraints.maxWidth : double.infinity,
+          height: _titleRowHeight,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              _buildHeaderTitle(),
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: KeyedSubtree(
+                    key: helpButtonKey,
+                    child: _buildCircleIconButton(
+                      icon: Icons.help_outline,
+                      active: isHelpPageVisible,
+                      tooltip: isHelpPageVisible
+                          ? l10n.tooltipCloseHelp
+                          : l10n.tooltipHelp,
+                      onTap: onHelpToggle,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: KeyedSubtree(
+                    key: cloudButtonKey,
+                    child: isAuthenticated
+                        ? _buildCloudMenuButton(context, accountInfo, loginMethod)
+                        : _buildLoginButton(context),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHeaderTitle() {
+    final textStyle = GoogleFonts.mPlusRounded1c(
+      fontSize: _headerTitleFontSize,
+      fontWeight: FontWeight.w700,
+      color: const Color(0xFF8B7355),
+      height: 1.1,
+    );
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Image.asset(
+          _headerIconAsset,
+          height: _headerTitleFontSize,
+          fit: BoxFit.contain,
+        ),
+        const SizedBox(width: 6),
+        Text(l10n.unitGachaHeaderTitle, style: textStyle),
+      ],
     );
   }
 
@@ -351,25 +346,36 @@ class UnitGachaCommonHeader extends StatelessWidget {
     String? loginMethod,
   ) {
     return PopupMenuButton<String>(
-      iconSize: 42.0,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(
+        minWidth: _iconButtonSize,
+        minHeight: _iconButtonSize,
+      ),
       icon: ValueListenableBuilder<int>(
         valueListenable: SimpleDataManager.cloudSyncInFlightListenable,
         builder: (context, inFlight, _) {
           final isSyncing = inFlight > 0;
-          if (isSyncing) {
-            return SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue.shade600),
-              ),
-            );
-          }
-          return Icon(
-            Icons.cloud,
-            color: Colors.blue.shade600,
-            size: 42.0,
+          return SizedBox(
+            width: _iconButtonSize,
+            height: _iconButtonSize,
+            child: Center(
+              child: isSyncing
+                  ? SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Colors.blue.shade600,
+                        ),
+                      ),
+                    )
+                  : Icon(
+                      Icons.cloud,
+                      color: Colors.blue.shade600,
+                      size: 28,
+                    ),
+            ),
           );
         },
       ),

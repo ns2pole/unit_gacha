@@ -2,16 +2,16 @@
 // 単位ガチャページのフィルタリング関連
 
 import 'package:flutter/material.dart';
-import '../../../problems/unit/problems.dart' show unitGachaItems;
-import '../../../problems/unit/symbol.dart' show UnitCategory, UnitProblem;
+import '../../../problems/unit/problems.dart' show unitExprProblems;
+import '../../../problems/unit/symbol.dart' show UnitCategory;
+import '../../../problems/unit/unit_expr_problem.dart' show UnitExprProblem;
 import '../../../localization/app_localizations.dart';
 import '../../../widgets/gacha/filter_chips.dart'
     show GachaExclusionFilterWidget;
 import '../pages/gacha_settings_page.dart';
 import '../../../utils/gacha_settings_utils.dart' show GachaSettingsSaver;
 import '../../../services/problems/exclusion_logic.dart'
-    show shouldExcludeByMode;
-import '../../../models/math_problem.dart';
+    show countRemainingExprProblems;
 import 'unit_gacha_problem_manager.dart' show UnitGachaProblemManager;
 
 /// フィルタリング関連のヘルパークラス
@@ -21,45 +21,30 @@ class UnitGachaFilterHelper {
 
   UnitGachaFilterHelper(this._l10n, this._problemManager);
 
-  /// フィルタリング後の問題数を計算（カテゴリーフィルタリング + 除外設定）
-  /// 実際の問題数（同じexprとmeaningを持つUnitProblemの数を合計）を返す
+  List<UnitExprProblem> _exprProblemsByCategories(
+    Set<UnitCategory> selectedCategories,
+  ) {
+    if (selectedCategories.isEmpty) {
+      return unitExprProblems;
+    }
+    final filtered = unitExprProblems
+        .where((ep) => selectedCategories.contains(ep.category))
+        .toList();
+    return filtered.isEmpty ? unitExprProblems : filtered;
+  }
+
+  /// ガチャに残る問題数（UnitExprProblem 単位。全 UnitProblem が N 連続正解で 1 減る）
   Future<int> getFilteredProblemCount(
     Set<UnitCategory> selectedCategories,
     GachaFilterMode gachaFilterMode,
   ) async {
+    final exprProblems = _exprProblemsByCategories(selectedCategories);
     if (gachaFilterMode == GachaFilterMode.random) {
-      return _problemManager.getTotalProblemCount(selectedCategories);
+      return exprProblems.length;
     }
 
-    // カテゴリーフィルタリング後の問題を取得
-    var filteredItems = unitGachaItems.where((item) {
-      if (selectedCategories.isEmpty) {
-        return true;
-      }
-      return selectedCategories.contains(
-        item.exprProblem.category,
-      );
-    }).toList();
-
-    if (filteredItems.isEmpty) {
-      filteredItems = unitGachaItems;
-    }
-
-    // 除外判定を実行（GachaFilterModeをExclusionModeに変換）
     final exclusionMode = gachaFilterMode.toExclusionMode();
-    final nonExcludedProblems = <UnitProblem>[];
-    for (final item in filteredItems) {
-      // UnitProblemを直接渡す（shouldExcludeByModeはdynamicを受け取る）
-      final shouldExclude = await shouldExcludeByMode(
-        item.unitProblem,
-        exclusionMode,
-      );
-      if (!shouldExclude) {
-        nonExcludedProblems.add(item.unitProblem);
-      }
-    }
-
-    return nonExcludedProblems.length;
+    return countRemainingExprProblems(exprProblems, exclusionMode);
   }
 
   /// フィルター設定部分を構築（除外設定のみ）
@@ -70,16 +55,7 @@ class UnitGachaFilterHelper {
     required VoidCallback onStateChanged,
     bool isProblemListMode = false,
   }) {
-    // 実際の問題数を計算（同じexprとmeaningを持つUnitProblemの数を合計）
-    final filteredItems = unitGachaItems.where((item) {
-      if (selectedCategories.isEmpty) {
-        return true;
-      }
-      return selectedCategories.contains(
-        item.exprProblem.category,
-      );
-    }).toList();
-    final totalCount = filteredItems.length;
+    final totalCount = _exprProblemsByCategories(selectedCategories).length;
 
     return FutureBuilder<int>(
       future: getFilteredProblemCount(selectedCategories, gachaFilterMode),

@@ -21,6 +21,7 @@ class AppLocalizations {
       'unitFormulaLabel': '計算式',
       'unitShortExplanation': '{symbol}は{meaning}。単位は{unit}。',
       'unitGachaName': '単位ガチャ',
+      'unitGachaHeaderTitle': '単位ガチャ !',
       'unitGachaDescription': '物理量の単位計算に挑戦！',
       'categoryMechanics': '力学',
       'categoryElectromagnetism': '電磁気学',
@@ -98,17 +99,11 @@ class AppLocalizations {
       'purchaseRestored': '購入を復元しました',
       'noPurchasesFound': '復元できる購入が見つかりませんでした',
       'restoreFailed': '復元に失敗しました: {error}',
-      'purchaseDialogBody': 'この問題は購入者向けです。',
       'restore': '復元',
       'purchase': '購入する',
       'purchaseCompleted': '購入が完了しました',
       'purchaseCancelled': '購入をキャンセルしました',
       'purchaseFailed': '購入に失敗しました',
-      'purchaseRecommendTitle': '購入のおすすめ',
-      'purchaseRecommendBody':
-          '{category}の問題を合計20回解きました。\n{category}の問題を購入して、続きも学習しますか？',
-      'purchaseRecommendLaterMessage':
-          '問題一覧に出ている鍵のマークを押すことでいつでも購入可能なので、必要があればご購入下さい。',
       'androidBillingPreparing': 'Android版の課金は現在準備中です。しばらくお待ちください。',
       'storagePermissionRequired': 'ストレージ権限が必要です',
       'imageSaved': '画像を保存しました: {path}',
@@ -179,7 +174,7 @@ class AppLocalizations {
       'rankingParticipation': 'ランキング参加',
       'nicknameOptional': 'ニックネーム（任意）',
       'save': '保存',
-      'rankingParticipationNote': '参加すると順位が表示されます（週間は同じ週の解答も反映）',
+      'rankingParticipationNote': '参加すると順位が表示されます（クラウドの学習履歴から集計）',
       'rankingLogoutConfirmTitle': 'ログアウト',
       'rankingLogoutConfirmBody': 'クラウドをログアウトするとランキング参加は解除されます。\nログアウトしますか？',
       'rankingLogoutDoneMessage': 'ログアウトしました（ランキング参加は解除されました）',
@@ -329,6 +324,7 @@ class AppLocalizations {
       'unitFormulaLabel': 'Expression',
       'unitShortExplanation': r'{symbol} is {meaning}. Unit: {unit}.',
       'unitGachaName': 'Unit Gacha',
+      'unitGachaHeaderTitle': 'Unit Gacha',
       'unitGachaDescription': 'Try calculating units of physical quantities!',
       'categoryMechanics': 'Mechanics',
       'categoryElectromagnetism': 'Electromagnetism',
@@ -406,17 +402,11 @@ class AppLocalizations {
       'purchaseRestored': 'Purchase restored',
       'noPurchasesFound': 'No purchases found to restore',
       'restoreFailed': 'Restore failed: {error}',
-      'purchaseDialogBody': 'This problem requires purchase.',
       'restore': 'Restore',
       'purchase': 'Purchase',
       'purchaseCompleted': 'Purchase completed',
       'purchaseCancelled': 'Purchase cancelled',
       'purchaseFailed': 'Purchase failed',
-      'purchaseRecommendTitle': 'Purchase recommendation',
-      'purchaseRecommendBody':
-          'You have solved {category} problems 20 times.\nWould you like to purchase {category} problems?',
-      'purchaseRecommendLaterMessage':
-          'You can purchase anytime by tapping the lock icon in the problem list, if needed.',
       'androidBillingPreparing':
           'In-app purchases on Android are coming soon. Please wait.',
       'storagePermissionRequired': 'Storage permission is required',
@@ -488,7 +478,7 @@ class AppLocalizations {
       'rankingParticipation': 'Ranking Participation',
       'nicknameOptional': 'Nickname (Optional)',
       'save': 'Save',
-      'rankingParticipationNote': 'Your rank will be displayed when you participate (weekly ranking also reflects earlier attempts in the same week).',
+      'rankingParticipationNote': 'Your rank will be displayed when you participate (derived from cloud learning history).',
       'rankingLogoutConfirmTitle': 'Log Out',
       'rankingLogoutConfirmBody': 'Logging out will disable ranking participation.\nDo you want to log out?',
       'rankingLogoutDoneMessage': 'Logged out (ranking participation disabled)',
@@ -711,6 +701,7 @@ class AppLocalizations {
   String get gachaIncorrect => _value('gachaIncorrect');
   String get gachaHistorySaved => _value('gachaHistorySaved');
   String get unitGachaName => _value('unitGachaName');
+  String get unitGachaHeaderTitle => _value('unitGachaHeaderTitle');
   String get unitGachaDescription => _value('unitGachaDescription');
   String filterNoExclusion(int total) =>
       _value('filterNoExclusion').replaceAll('{count}', total.toString());
@@ -780,16 +771,11 @@ class AppLocalizations {
   String get purchaseRestored => _value('purchaseRestored');
   String get noPurchasesFound => _value('noPurchasesFound');
   String restoreFailed(String error) => _value('restoreFailed').replaceAll('{error}', error);
-  String get purchaseDialogBody => _value('purchaseDialogBody');
   String get restore => _value('restore');
   String get purchase => _value('purchase');
   String get purchaseCompleted => _value('purchaseCompleted');
   String get purchaseCancelled => _value('purchaseCancelled');
   String get purchaseFailed => _value('purchaseFailed');
-  String get purchaseRecommendTitle => _value('purchaseRecommendTitle');
-  String purchaseRecommendBody(String category) =>
-      _value('purchaseRecommendBody').replaceAll('{category}', category);
-  String get purchaseRecommendLaterMessage => _value('purchaseRecommendLaterMessage');
   String get androidBillingPreparing => _value('androidBillingPreparing');
   String get storagePermissionRequired => _value('storagePermissionRequired');
   String imageSaved(String path) => _value('imageSaved').replaceAll('{path}', path);

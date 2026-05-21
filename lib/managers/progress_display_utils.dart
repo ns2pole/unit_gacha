@@ -4,10 +4,13 @@
 import '../models/math_problem.dart';
 import '../pages/common/problem_status.dart';
 import '../services/problems/simple_data_manager.dart';
-import '../services/problems/exclusion_logic.dart' show shouldExcludeByMode;
+import '../services/problems/exclusion_logic.dart'
+    show
+        countRemainingExprProblems,
+        shouldExcludeByMode,
+        exclusionModeFromLatestN;
 import '../pages/gacha/pages/gacha_settings_page.dart';
-import '../problems/unit/symbol.dart' show UnitProblem;
-import '../problems/unit/problems.dart' show unitGachaItems;
+import '../problems/unit/problems.dart' show unitExprProblems;
 
 /// 達成率情報
 class ProgressInfo {
@@ -26,7 +29,7 @@ class ProgressInfo {
 
 /// 実際のガチャの除外判定ロジックと同じ方法で問題をフィルタリングし、
 /// フィルタリングに引っかかった問題数を返す
-/// 単位ガチャの場合はUnitProblem単位でカウント（UnitProblemにつき1問）
+/// 単位ガチャの場合は残り UnitExprProblem 件数を返す（1 expr = 1問）
 Future<int> getFilteredProblemCount({
   required String prefsPrefix,
   required List<MathProblem> problemPool,
@@ -51,18 +54,9 @@ Future<int> getFilteredProblemCount({
       return 0;
   }
 
-  // 単位ガチャの場合は実際の問題数をカウント（同じexprとmeaningを持つUnitProblemの数を合計）
   if (prefsPrefix == 'unit') {
     final exclusionMode = filterMode.toExclusionMode();
-    final nonExcludedProblems = <UnitProblem>[];
-    for (final item in unitGachaItems) {
-      final shouldExclude = await shouldExcludeByMode(
-        item.unitProblem,
-        exclusionMode,
-      );
-      if (!shouldExclude) nonExcludedProblems.add(item.unitProblem);
-    }
-    return nonExcludedProblems.length;
+    return countRemainingExprProblems(unitExprProblems, exclusionMode);
   }
 
   // それ以外の場合は従来通りMathProblem単位でカウント
@@ -92,29 +86,10 @@ Future<bool> _shouldExcludeProblemByGachaFilterMode(
     return false;
   }
 
-  // SimpleDataManagerから学習記録データを取得
-  final slots = await _getSlotsForProblem(problem);
-
-  // newest to oldest, collect non-none
-  final nonNone = <ProblemStatus>[];
-  for (var i = slots.length - 1; i >= 0; i--) {
-    final st = slots[i]['status'] as ProblemStatus? ?? ProblemStatus.none;
-    if (st != ProblemStatus.none) nonNone.add(st);
-  }
-
-  // 最新から見て、緑が連続して何個並んでいるかを数える
-  int consecutiveSolved = 0;
-  for (final status in nonNone) {
-    if (status == ProblemStatus.solved) {
-      consecutiveSolved++;
-    } else {
-      // 緑以外が来たら連続が途切れる
-      break;
-    }
-  }
-
-  // 連続数がneeded以上なら除外
-  return consecutiveSolved >= needed;
+  return shouldExcludeByMode(
+    problem,
+    exclusionModeFromLatestN(needed),
+  );
 }
 
 /// 問題のスロットを取得（実際のガチャと同じロジック）
@@ -161,9 +136,8 @@ Future<ProgressInfo> getGachaProgress({
   final settings = await SimpleDataManager.getGachaSettings(prefsPrefix);
   final filterModeStr = settings['filterMode'] as String?;
 
-  // 単位ガチャの場合は実際の問題数をカウント（同じexprとmeaningを持つUnitProblemの数を合計）、それ以外はproblemPool.length
   final totalCount = prefsPrefix == 'unit'
-      ? unitGachaItems.length
+      ? unitExprProblems.length
       : problemPool.length;
 
   // filterModeが存在する場合はGachaFilterModeとして処理（全ガチャ共通）
@@ -209,11 +183,14 @@ Future<ProgressInfo> getGachaProgress({
       }
     }
 
-    final achievedCount = await getFilteredProblemCount(
+    final remainingOrExcluded = await getFilteredProblemCount(
       prefsPrefix: prefsPrefix,
       problemPool: problemPool,
       filterMode: actualFilterMode,
     );
+    final achievedCount = prefsPrefix == 'unit'
+        ? totalCount - remainingOrExcluded
+        : remainingOrExcluded;
 
     final filterDescription = needed > 0 ? '最新$needed回の' : '除外なし';
 
@@ -227,11 +204,14 @@ Future<ProgressInfo> getGachaProgress({
 
   // filterModeが存在しない場合は除外なしとして返す（最新1回で集計）
   // 最新1回の条件でフィルタリングして達成率を計算
-  final achievedCount = await getFilteredProblemCount(
+  final remainingOrExcluded = await getFilteredProblemCount(
     prefsPrefix: prefsPrefix,
     problemPool: problemPool,
     filterMode: GachaFilterMode.excludeSolvedGE1,
   );
+  final achievedCount = prefsPrefix == 'unit'
+      ? totalCount - remainingOrExcluded
+      : remainingOrExcluded;
 
   return ProgressInfo(
     achievedCount: achievedCount,

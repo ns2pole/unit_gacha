@@ -5,13 +5,10 @@ import 'package:flutter/material.dart';
 import '../../localization/app_localizations.dart';
 import '../../services/auth/firebase_auth_service.dart';
 import '../../services/auth/firestore_public_profile_service.dart';
-import '../../services/problems/simple_data_manager.dart';
-
 /// Ranking settings panel (participation toggle + nickname) for Unit Gacha.
 ///
 /// - Shows a "login required" hint when user is not authenticated.
-/// - When participating is enabled, attempts to sync queued attempt events to Firestore
-///   in the background (best-effort).
+/// - When participating is enabled, requests server-side ranking init from learning history.
 class UnitGachaRankingSettingsPanel extends StatefulWidget {
   final bool showWhenLoggedOut;
   final EdgeInsetsGeometry padding;
@@ -57,22 +54,9 @@ class _UnitGachaRankingSettingsPanelState extends State<UnitGachaRankingSettings
       widget.onRankingChanged?.call();
 
       if (value) {
-        // Best-effort background sync for ranking events
         unawaited(() async {
-          try {
-            await SimpleDataManager.syncUnitGachaAttemptEventsToFirestore();
-          } catch (_) {
-            // keep participation state; next sync will catch up
-          }
           if (!mounted) return;
           if (opId != _participationOpId) return;
-          // poke initRequestedAt again after sync (best-effort)
-          try {
-            await FirestorePublicProfileService.setUnitGachaParticipating(
-              userId: uid,
-              participating: true,
-            );
-          } catch (_) {}
           widget.onRankingChanged?.call();
         }());
       }

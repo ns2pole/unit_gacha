@@ -5,8 +5,6 @@ import '../../../problems/unit/symbol.dart' show UnitProblem;
 import '../../../widgets/unit/unit_calculator.dart' show CalculatorType;
 import '../../../services/calculator/unit_calculator_service.dart' show NormalizedUnit;
 import '../data/unit_gacha_history.dart' show UnitGachaHistoryManager;
-import '../../../services/problems/simple_data_manager.dart';
-
 /// 解答処理クラス
 class UnitGachaAnswerHandler {
   /// 解答を処理する
@@ -122,13 +120,6 @@ class UnitGachaAnswerHandler {
       unitProblem: unitProblem,
       isCorrect: isCorrect,
       byCalculator: true,
-    );
-
-    // ランキング用の解答イベント（電卓Enter由来のみ）
-    // - オフライン時はローカルに溜め、ログイン後の同期でアップロードする
-    await SimpleDataManager.enqueueUnitGachaAttemptEvent(
-      problemId: unitProblem.id,
-      isCorrect: isCorrect,
     );
   }
 }

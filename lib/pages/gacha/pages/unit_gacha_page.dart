@@ -8,10 +8,6 @@ import '../../../localization/app_localizations.dart';
 import '../../../localization/app_locale.dart';
 import '../../../problems/unit/symbol.dart' show UnitCategory, UnitProblem;
 import '../../../problems/unit/unit_gacha_item.dart' show UnitGachaItem;
-import '../../../util/platform_info.dart';
-import '../../../services/payment/problem_access_service.dart';
-import '../../../services/payment/revenuecat_service.dart';
-import '../../../services/problems/simple_data_manager.dart';
 import '../../../widgets/unit/unit_calculator.dart'
     show CalculatorType, UnitCalculator;
 import '../../../widgets/home/background_image_widget.dart';
@@ -56,8 +52,7 @@ import '../drawing/unit_gacha_drawing_tools.dart'
     show DrawingTool, DrawingToolState;
 import '../ui/palette/unit_gacha_ipad_palette.dart' show UnitGachaIPadPalette;
 import '../../../problems/unit/problems.dart' show unitExprProblems;
-
-enum _PurchaseRecommendCheckResult { shownOrResolved, blocked, nothing }
+import '../../../services/problems/simple_data_manager.dart';
 
 /// 単位ガチャページ
 class UnitGachaPage extends StatefulWidget {
@@ -120,13 +115,7 @@ class _UnitGachaPageState extends State<UnitGachaPage> {
 
   bool _hasAnyUnlockedInSelection = true; // デフォルトはtrueとしておく
 
-  // ===========================================================================
-  // Purchase recommend (mechanics / electromagnetism) - once per category
-  // ===========================================================================
-  static const int _purchaseRecommendThreshold = 20;
-  bool _purchaseRecommendNextBusy = false;
-  bool _purchaseRecommendBootCheckScheduled = false;
-  bool _purchaseRecommendBootCheckNeedsRetry = true;
+  VoidCallback? _learningEpochListener;
 
   // Home icon guide (first time only)
   static const String _prefsKeyHomeIconGuideCompleted =
@@ -179,194 +168,6 @@ class _UnitGachaPageState extends State<UnitGachaPage> {
     return <UnitGachaItem>[];
   }
 
-  bool _isOverlayBlockingPurchaseRecommend() {
-    return _isScratchPaperMode ||
-        _isHelpPageVisible ||
-        _isProblemListVisible ||
-        _isReferenceTableVisible ||
-        _isDataAnalysisVisible ||
-        _isAuthPageVisible ||
-        _showHomeIconGuide ||
-        _showCalculatorHelpSpotlight;
-  }
-
-  String? _productIdForCategory(UnitCategory c) {
-    switch (c) {
-      case UnitCategory.mechanics:
-        return 'mechanics_all_unlock';
-      case UnitCategory.electromagnetism:
-        return 'electromagnetism_all_unlock';
-      case UnitCategory.thermodynamics:
-      case UnitCategory.waves:
-      case UnitCategory.atom:
-        return null;
-    }
-  }
-
-  Future<void> _onPurchaseRecommendAttemptConfirmed(UnitCategory category) async {
-    // 20回おすすめ購入ダイアログは iOS のみで表示する。
-    if (!PlatformInfo.isIOS) return;
-    if (category != UnitCategory.mechanics &&
-        category != UnitCategory.electromagnetism) {
-      return;
-    }
-
-    final shown = await SimpleDataManager.getPurchaseRecommendShown(category);
-    final next = await SimpleDataManager.incrementPurchaseRecommendAttemptCount(
-      category,
-    );
-    if (!shown && next >= _purchaseRecommendThreshold) {
-      await SimpleDataManager.setPurchaseRecommendPending(category, true);
-    }
-  }
-
-  Future<_PurchaseRecommendCheckResult> _maybeShowPurchaseRecommendIfPending({
-    required String trigger,
-  }) async {
-    // 念のため二重ガード（Android等では絶対におすすめダイアログを出さない）
-    if (!PlatformInfo.isIOS) return _PurchaseRecommendCheckResult.nothing;
-    if (!mounted) return _PurchaseRecommendCheckResult.nothing;
-    if (_isOverlayBlockingPurchaseRecommend()) {
-      return _PurchaseRecommendCheckResult.blocked;
-    }
-
-    UnitCategory? target;
-    for (final c in const [
-      UnitCategory.mechanics,
-      UnitCategory.electromagnetism,
-    ]) {
-      final pending = await SimpleDataManager.getPurchaseRecommendPending(c);
-      if (!pending) continue;
-
-      final shown = await SimpleDataManager.getPurchaseRecommendShown(c);
-      if (shown) {
-        await SimpleDataManager.setPurchaseRecommendPending(c, false);
-        continue;
-      }
-      target = c;
-      break;
-    }
-
-    if (target == null) return _PurchaseRecommendCheckResult.nothing;
-
-    final pid = _productIdForCategory(target);
-    if (pid == null || pid.isEmpty) {
-      await SimpleDataManager.setPurchaseRecommendPending(target, false);
-      await SimpleDataManager.setPurchaseRecommendShown(target, true);
-      return _PurchaseRecommendCheckResult.shownOrResolved;
-    }
-
-    final alreadyPurchased = await RevenueCatService.isProductPurchased(pid);
-    if (alreadyPurchased) {
-      await SimpleDataManager.setPurchaseRecommendPending(target, false);
-      await SimpleDataManager.setPurchaseRecommendShown(target, true);
-      return _PurchaseRecommendCheckResult.shownOrResolved;
-    }
-
-    if (!mounted) return _PurchaseRecommendCheckResult.nothing;
-
-    final l10n = AppLocalizations.of(context);
-    final categoryName = l10n.unitCategory(target);
-    bool busy = false;
-    PurchaseResult? purchaseResult;
-
-    final action = await showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setLocalState) {
-            Future<void> run(Future<void> Function() fn) async {
-              if (busy) return;
-              setLocalState(() => busy = true);
-              try {
-                await fn();
-              } finally {
-                if (context.mounted) setLocalState(() => busy = false);
-              }
-            }
-
-            return AlertDialog(
-              title: Text(l10n.purchaseRecommendTitle),
-              content: Text(
-                l10n.purchaseRecommendBody(categoryName),
-                style: const TextStyle(height: 1.4),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: busy
-                      ? null
-                      : () => Navigator.of(dialogContext).pop('later'),
-                  child: Text(l10n.cloudSavePromptLater),
-                ),
-                TextButton(
-                  onPressed: busy
-                      ? null
-                      : () => run(() async {
-                            purchaseResult =
-                                await RevenueCatService.purchaseProduct(pid);
-                            ProblemAccessService.clearCache();
-                            if (!dialogContext.mounted) return;
-                            Navigator.of(dialogContext).pop('purchase');
-                          }),
-                  child: busy
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(l10n.purchase),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    // Mark as shown regardless of outcome (the recommend dialog itself is one-time).
-    await SimpleDataManager.setPurchaseRecommendPending(target, false);
-    await SimpleDataManager.setPurchaseRecommendShown(target, true);
-
-    if (!mounted) return _PurchaseRecommendCheckResult.shownOrResolved;
-
-    if (action == 'later') {
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) {
-          return AlertDialog(
-            content: Text(
-              l10n.purchaseRecommendLaterMessage,
-              style: const TextStyle(height: 1.4),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text(l10n.commonClose),
-              ),
-            ],
-          );
-        },
-      );
-      return _PurchaseRecommendCheckResult.shownOrResolved;
-    }
-
-    final res = purchaseResult;
-    if (res != null) {
-      final msg = res.success
-          ? l10n.purchaseCompleted
-          : (res.cancelled
-              ? l10n.purchaseCancelled
-              : (res.error ?? l10n.purchaseFailed));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
-      );
-      setState(() {});
-    }
-
-    return _PurchaseRecommendCheckResult.shownOrResolved;
-  }
-
   @override
   void initState() {
     super.initState();
@@ -401,6 +202,14 @@ class _UnitGachaPageState extends State<UnitGachaPage> {
 
     // Pro版購入状態を確認
     _checkProVersionStatus();
+
+    _learningEpochListener = () {
+      if (!mounted) return;
+      setState(() {});
+    };
+    SimpleDataManager.learningDataEpochListenable.addListener(
+      _learningEpochListener!,
+    );
 
     // iPadの場合はパレット位置を読み込む
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -442,6 +251,10 @@ class _UnitGachaPageState extends State<UnitGachaPage> {
 
   @override
   void dispose() {
+    final l = _learningEpochListener;
+    if (l != null) {
+      SimpleDataManager.learningDataEpochListenable.removeListener(l);
+    }
     _activeToolNotifier.dispose();
     _isDrawingNotifier.dispose();
     _homeScrollController.dispose();
@@ -557,7 +370,7 @@ class _UnitGachaPageState extends State<UnitGachaPage> {
     }
   }
 
-  void _handleAnswer(String input) {
+  Future<void> _handleAnswer(String input) async {
     final currentItem = _selectedProblems[_currentProblemIndex];
     final currentProblem = currentItem.unitProblem;
     final currentCalculatorType =
@@ -570,6 +383,8 @@ class _UnitGachaPageState extends State<UnitGachaPage> {
       isAnswered: _isAnswered,
       currentSolvedCount: _solvedCount,
     );
+
+    if (!mounted) return;
 
     setState(() {
       _isAnswered = result.isAnswered;
@@ -593,42 +408,26 @@ class _UnitGachaPageState extends State<UnitGachaPage> {
       );
     }
 
-    // 学習記録を保存
-    UnitGachaAnswerHandler.saveLearningRecord(
+    // 学習記録を保存（完了を待ってから次へ進める）
+    await UnitGachaAnswerHandler.saveLearningRecord(
       unitProblem: currentProblem,
       isCorrect: result.isCorrect,
       isHistoryEnabled: _isHistoryEnabled,
     );
-
-    // Purchase recommend counter (per category; correct/incorrect both count).
-    // Triggered on "confirm" only (handleAnswer blocks if isAnswered==true).
-    unawaited(_onPurchaseRecommendAttemptConfirmed(currentItem.exprProblem.category));
   }
 
   void _nextProblem() {
-    if (_purchaseRecommendNextBusy) return;
-    _purchaseRecommendNextBusy = true;
-
-    unawaited(() async {
-      try {
-        await _maybeShowPurchaseRecommendIfPending(trigger: 'next');
-        if (!mounted) return;
-
-        if (_currentProblemIndex < _selectedProblems.length - 1) {
-          setState(() {
-            _currentProblemIndex++;
-            _isAnswered = false;
-            _isCorrect = false;
-            _userInput = '';
-          });
-        } else {
-          // すべての問題が終了したら、自動的に新しい問題を読み込む（アラートは表示しない）
-          await _refreshProblems();
-        }
-      } finally {
-        _purchaseRecommendNextBusy = false;
-      }
-    }());
+    if (_currentProblemIndex < _selectedProblems.length - 1) {
+      setState(() {
+        _currentProblemIndex++;
+        _isAnswered = false;
+        _isCorrect = false;
+        _userInput = '';
+      });
+    } else {
+      // すべての問題が終了したら、自動的に新しい問題を読み込む（アラートは表示しない）
+      unawaited(_refreshProblems());
+    }
   }
 
   /// 問題画面の戻る挙動を統一的に処理
@@ -671,27 +470,6 @@ class _UnitGachaPageState extends State<UnitGachaPage> {
             _showHomeIconGuide = true;
             _homeIconGuideStep = 0;
           });
-        }
-      });
-    }
-
-    // Boot fallback: if a recommend dialog is pending (reached 20 attempts, but not shown),
-    // show it once when the UI is in a safe state. If blocked by other overlays, retry later.
-    //
-    // NOTE: Placed after the home icon guide check so that if the guide decides to open
-    // an overlay in the same frame, our post-frame callback runs after it and safely skips.
-    if (_purchaseRecommendBootCheckNeedsRetry &&
-        !_purchaseRecommendBootCheckScheduled) {
-      _purchaseRecommendBootCheckScheduled = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        final r = await _maybeShowPurchaseRecommendIfPending(trigger: 'boot');
-        if (!mounted) return;
-        if (r == _PurchaseRecommendCheckResult.blocked) {
-          setState(() {
-            _purchaseRecommendBootCheckScheduled = false;
-          });
-        } else {
-          _purchaseRecommendBootCheckNeedsRetry = false;
         }
       });
     }

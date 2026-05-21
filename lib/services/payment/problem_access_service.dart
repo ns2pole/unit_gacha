@@ -1,4 +1,4 @@
-import 'revenuecat_service.dart';
+// import 'revenuecat_service.dart'; // 課金チェック復元時に戻す
 import 'problem_access_map.dart';
 import '../../problems/unit/unit_expr_problem.dart' show UnitExprProblem;
 
@@ -20,7 +20,10 @@ class ProblemAccessService {
     return requiredProductIdByExprKey[key];
   }
 
+  /// 無料解放中: 常にアンロック。課金を再有効にするにはコメント内の旧実装を復元し、この先頭の `return true` を削除する。
   static Future<bool> isExprProblemUnlocked(UnitExprProblem ep) async {
+    return true;
+    /*
     final pid = requiredProductIdFor(ep);
     if (pid == null || pid.isEmpty) return true;
 
@@ -30,5 +33,6 @@ class ProblemAccessService {
     final fut = RevenueCatService.isProductPurchased(pid);
     _purchaseCacheByProductId[pid] = fut;
     return fut;
+    */
   }
 }

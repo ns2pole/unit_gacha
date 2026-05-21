@@ -109,26 +109,6 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
-      // ============================================================
-      // 解答イベント（ランキング集計用）
-      // ============================================================
-      // パス: users/{userId}/unit_gacha_attempt_events/{eventId}
-      match /unit_gacha_attempt_events/{eventId} {
-        allow read: if isOwner(userId);
-        allow create: if isOwner(userId)
-          && request.resource.data.keys().hasOnly(['problemId', 'status', 'clientTime'])
-          && isString(request.resource.data.problemId)
-          && isString(request.resource.data.status)
-          && (request.resource.data.status == 'solved' || request.resource.data.status == 'failed')
-          && isString(request.resource.data.clientTime);
-        // 冪等性: 同じeventIdで同じ内容を再送する場合のみupdateを許可（内容変更は不可）
-        allow update: if isOwner(userId)
-          && request.resource.data.keys().hasOnly(['problemId', 'status', 'clientTime'])
-          && request.resource.data.problemId == resource.data.problemId
-          && request.resource.data.status == resource.data.status
-          && request.resource.data.clientTime == resource.data.clientTime;
-        allow delete: if false;
-      }
     }
 
     // ============================================================
