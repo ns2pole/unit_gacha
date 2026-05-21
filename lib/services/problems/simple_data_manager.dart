@@ -1768,6 +1768,86 @@ class SimpleDataManager {
     }
   }
 
+  /// アカウント固有のローカルデータをクリア（学習記録、設定など）
+  static Future<bool> clearAccountSpecificData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final allKeys = prefs.getKeys();
+      const keysToKeep = [_versionKey, _lastUserIdKey];
+      const patternsToClear = [
+        '$_namespace/learning/',
+        '$_namespace/gacha/',
+        '$_namespace/user_settings',
+        '$_namespace/settings_pending/',
+        '$_namespace/firestore_sync_completed_',
+      ];
+
+      for (final key in allKeys) {
+        if (keysToKeep.contains(key)) continue;
+        var shouldClear = false;
+        for (final pattern in patternsToClear) {
+          if (key.startsWith(pattern)) {
+            shouldClear = true;
+            break;
+          }
+        }
+        if (!shouldClear && key.startsWith(_namespace)) {
+          shouldClear = true;
+        }
+        if (shouldClear) await prefs.remove(key);
+      }
+
+      _invalidateLearningCaches();
+      _invalidateSettingsCaches();
+      return true;
+    } catch (e) {
+      print('Error clearing account-specific data: $e');
+      return false;
+    }
+  }
+
+  /// ログイン中アカウントのクラウド学習履歴を端末へ復元
+  static Future<void> _hydrateLocalLearningRecordsFromCloud() async {
+    final userId = FirebaseAuthService.userId;
+    if (userId == null) return;
+
+    try {
+      final remote = await FirestoreLearningService.getAllLearningRecords(
+        userId: userId,
+      );
+      if (remote.isEmpty) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      for (final entry in remote.entries) {
+        final cloud = entry.value;
+        final record = _buildLearningRecordData(
+          problemId: entry.key,
+          history: cloud['history'],
+          fallbackUpdatedAt: cloud['lastUpdated'] as String?,
+        );
+        await _saveLocalLearningRecord(
+          prefs,
+          entry.key,
+          record,
+          notify: false,
+        );
+      }
+      _notifyLearningDataChanged();
+    } catch (e) {
+      print('Error hydrating learning records from cloud: $e');
+    }
+  }
+
+  /// アカウント切替時: 前アカウントの端末データを消し、新アカウントのクラウドから復元
+  static Future<void> syncOnAccountSwitch() async {
+    await clearAccountSpecificData();
+    await _hydrateLocalLearningRecordsFromCloud();
+    final currentUserId = FirebaseAuthService.userId;
+    if (currentUserId != null) {
+      await setLastUserId(currentUserId);
+    }
+  }
+
   // ============================================================================
   // 無料で履歴管理可能なガチャ選択機能
   // ============================================================================
