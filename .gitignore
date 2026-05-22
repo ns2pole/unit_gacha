@@ -109,3 +109,7 @@ assets/*.key
 
 # Optional: local dart-define bundle (see CONFIGURE.md)
 /dart_defines.json
+
+# Codemagic 署名素材（ローカル生成。リポジトリに含めない）
+codemagic-signing/
+codemagic-env-paste.txt

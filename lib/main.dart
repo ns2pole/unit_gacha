@@ -11,6 +11,7 @@ import 'managers/app_logger.dart';
 import 'localization/app_localizations.dart';
 import 'localization/app_locale.dart';
 import 'firebase_options.dart';
+import 'managers/update_checker.dart';
 
 // 共有の navigatorKey を1つだけ作る
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
@@ -52,6 +53,15 @@ void main() async {
     } else {
       AppLogger.warning('RevenueCatの初期化に失敗しました', 
         details: 'AndroidではAPIキーが設定されていない可能性があります（正常動作に影響なし）');
+    }
+
+    if (!kIsWeb) {
+      UpdateChecker(
+        iosId: '6756411322',
+        androidId: 'com.joyphysics.unitgacha',
+        skipDays: 3,
+        navigatorKey: appNavigatorKey,
+      ).checkOnAppStart();
     }
   });
 }

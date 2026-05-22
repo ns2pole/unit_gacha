@@ -1,0 +1,112 @@
+# Codemagic: iOS をクラウド Mac（Xcode 26）でビルドし App Store Connect へ提出
+#
+# Developer Portal 連携（UI）が FORBIDDEN でも動くよう、API Key は環境変数で渡す。
+#
+# === Codemagic アプリ設定でやること ===
+#
+# 1. Application → Environment variables → グループ appstore_credentials を作成
+#
+# 2. 環境変数グループ appstore_credentials に Secret を 1 つだけ追加:
+#    APP_STORE_CONNECT_PRIVATE_KEY = AuthKey_<KEY_ID>.p8 の全文
+#    （Key ID / Issuer ID は下の vars。joymath と同じ API キーなら同じ値で可）
+#
+# 3. Team settings → Code signing identities（Developer Portal 連携なしで可）
+#    - Upload: Apple Distribution 証明書 (.p12)
+#    - Upload: com.joyphysics.unitgacha の App Store プロビジョニング (.mobileprovision)
+#    ※ Fetch は Portal 連携が要るため、手元 Mac からエクスポートして Upload
+#    手元: ./scripts/export_codemagic_signing.sh
+#
+# 4. push → ワークフロー ios-appstore-release を実行（APP_STORE_APPLE_ID はリポジトリに記載済み）
+#
+# 5. Firebase — 環境変数グループ firebase_credentials を作成し Secret を追加:
+#    GOOGLE_SERVICES_JSON = Firebase の google-services.json の全文
+#    GOOGLE_SERVICE_INFO_PLIST = Firebase の GoogleService-Info.plist の全文
+#    （base64 なら GOOGLE_SERVICES_JSON_BASE64 / GOOGLE_SERVICE_INFO_PLIST_BASE64 でも可）
+#
+# 参考: https://docs.codemagic.io/yaml-publishing/app-store-connect/
+
+workflows:
+  ios-appstore-release:
+    name: iOS App Store (IPA ビルドと審査提出)
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    environment:
+      groups:
+        - appstore_credentials
+        - firebase_credentials
+      vars:
+        # joymath と同じ App Store Connect API キーならそのまま。別キーなら差し替え。
+        APP_STORE_CONNECT_KEY_IDENTIFIER: ATBD5UGJTG
+        APP_STORE_CONNECT_ISSUER_ID: c64fb6be-f1d2-4e04-80b5-2841def3da52
+        # App Store: Unit Gacha ! (bundle com.joyphysics.unitgacha)
+        APP_STORE_APPLE_ID: "6756411322"
+      xcode: 26.4
+      flutter: stable
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.joyphysics.unitgacha
+    scripts:
+      - name: Flutter pub get
+        script: |
+          set -e
+          flutter pub get
+      - name: Inject Firebase Android config
+        script: |
+          set -e
+          dart run tool/inject_google_services_json.dart
+      - name: Inject Firebase iOS config
+        script: |
+          set -e
+          dart run tool/inject_google_service_info_plist.dart
+      - name: CocoaPods (ios)
+        script: |
+          set -e
+          cd ios && pod install && cd ..
+      - name: Flutter build IPA
+        script: |
+          set -e
+          VER_LINE=$(grep '^version:' pubspec.yaml | head -1 | awk '{print $2}' | tr -d "'\"")
+          VERSION_NAME="${VER_LINE%+*}"
+          if [ -n "${APP_STORE_APPLE_ID:-}" ]; then
+            LATEST=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID")
+            VERSION_CODE=$((LATEST + 1))
+          else
+            VERSION_CODE="${VER_LINE#*+}"
+          fi
+          echo "Building $VERSION_NAME ($VERSION_CODE)"
+
+          flutter build ios --release --config-only
+
+          xcode-project use-profiles
+
+          if [ ! -f /Users/builder/export_options.plist ]; then
+            echo "ERROR: /Users/builder/export_options.plist が生成されていません"
+            exit 1
+          fi
+
+          echo "=== com.joyphysics.unitgacha 用プロファイル ==="
+          for f in "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision; do
+            if security cms -D -i "$f" 2>/dev/null | grep -q '7K99YVR868.com.joyphysics.unitgacha'; then
+              echo "--- $f ---"
+              security cms -D -i "$f" | grep -E '<key>Name</key>|<key>UUID</key>|applesignin' || true
+            fi
+          done
+          echo "=== export_options.plist ==="
+          cat /Users/builder/export_options.plist
+
+          flutter build ipa --release \
+            --build-name="$VERSION_NAME" \
+            --build-number="$VERSION_CODE" \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: false
+        submit_to_app_store: true
+        cancel_previous_submissions: true
+        release_type: AFTER_APPROVAL

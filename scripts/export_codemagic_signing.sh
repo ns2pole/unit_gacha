@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Codemagic に Upload する .p12 / .mobileprovision を用意する。
+# 実行: ./scripts/export_codemagic_signing.sh
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+OUT="$ROOT/codemagic-signing"
+mkdir -p "$OUT"
+
+echo "==> Provisioning profile (com.joyphysics.unitgacha App Store)"
+if [[ -f "$OUT/com.joyphysics.unitgacha.appstore.mobileprovision" ]]; then
+  echo "    既にあります: $OUT/com.joyphysics.unitgacha.appstore.mobileprovision"
+else
+  echo "    無い場合は App Store Connect API または developer.apple.com から DL"
+fi
+
+echo "==> Distribution certificate (.p12)"
+P12="$OUT/unitgacha-distribution.p12"
+read -r -s -p "キーチェーンのパスワード（Mac ログイン）: " LOGIN_PASS
+echo
+read -r -p "p12 に付けるパスワード（Codemagic 登録時に使う）: " P12_PASS
+security export -k "$HOME/Library/Keychains/login.keychain-db" -t identities -f pkcs12 -o "$P12" -P "$P12_PASS" <<< "$LOGIN_PASS" 2>/dev/null || \
+  security export -k "$HOME/Library/Keychains/login.keychain-db" -t identities -f pkcs12 -o "$P12" -P "$P12_PASS"
+echo "    書き出し: $P12"
+echo "    Codemagic の p12 パスワード: $P12_PASS"
+echo ""
+echo "Codemagic → Code signing identities → Upload:"
+echo "  - $P12"
+echo "  - $OUT/com.joyphysics.unitgacha.appstore.mobileprovision"

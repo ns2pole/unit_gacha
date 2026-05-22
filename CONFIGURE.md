@@ -50,3 +50,7 @@ GitHub Actions should set the same keys as encrypted repository secrets and pass
 2. **Settings → Secrets and variables → Actions**: add the secrets referenced in [`.github/workflows/pages.yml`](.github/workflows/pages.yml) (`FIREBASE_WEB_API_KEY`, `FIREBASE_WEB_APP_ID`, etc.).
 3. After the first successful run, the site is served at `https://ns2pole.github.io/unit_gacha/` (project page; build uses `--base-href /unit_gacha/`).
 4. In Firebase Console → Authentication → **Authorized domains**, add `ns2pole.github.io`.
+
+## Codemagic（iOS App Store）
+
+詳細は [`RELEASE_SETUP.md`](RELEASE_SETUP.md)。Secret の中身は `./scripts/prepare_codemagic_env.sh` が手元ファイルから生成する。

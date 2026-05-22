@@ -65,6 +65,13 @@ bundle exec fastlane release_all_platforms skip_build:true skip_ios:true skip_an
 - iOS アップロード時:
   - `ASC_*` か `FASTLANE_USER` + `FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD` が無い
 
+### Codemagic（iOS のみ・クラウドビルド）
+
+joymath と同様に [`codemagic.yaml`](../codemagic.yaml) を使用。手元 fastlane とは別経路。
+
+- 要設定: `appstore_credentials`, `firebase_credentials`, Code signing Upload, `APP_STORE_APPLE_ID`
+- 詳細: ルート [`README.md`](../README.md) / [`CONFIGURE.md`](../CONFIGURE.md)
+
 ### リリース実行例
 
 ```bash

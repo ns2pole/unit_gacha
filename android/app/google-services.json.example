@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:YOUR_NUMBER:android:YOUR_SUFFIX",
         "android_client_info": {
-          "package_name": "com.example.app"
+          "package_name": "com.joyphysics.unitgacha"
         }
       },
       "oauth_client": [],
