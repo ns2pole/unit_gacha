@@ -16,6 +16,14 @@ import 'managers/update_checker.dart';
 // 共有の navigatorKey を1つだけ作る
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
+/// Web ビルド用 dart-define が渡されているか（ネイティブは plist/json を使用）
+bool get _isFirebaseWebConfigured {
+  const opts = DefaultFirebaseOptions.web;
+  return opts.apiKey.isNotEmpty &&
+      opts.appId.isNotEmpty &&
+      opts.projectId.isNotEmpty;
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -23,15 +31,29 @@ void main() async {
   AppLogger.resetSectionCounter(totalSections: 3);
   AppLogger.section('アプリケーション初期化', showNumber: true);
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    final apps = Firebase.apps;
-    if (apps.isEmpty) {
-      AppLogger.warning('Firebaseアプリリストが空です',
-        details: '設定ファイルが不足している可能性があります:\n- Android: android/app/google-services.json\n- iOS: ios/Runner/GoogleService-Info.plist\nFirebase機能は利用できません。');
+    if (kIsWeb && !_isFirebaseWebConfigured) {
+      AppLogger.warning(
+        'Web: Firebase が未設定です',
+        details:
+            'GitHub Actions の Secrets か --dart-define で Web 用 Firebase を設定してください（CONFIGURE.md）。',
+      );
     } else {
-      AppLogger.success('Firebaseの初期化が完了しました', details: 'アプリ数: ${apps.length}');
+      await Firebase.initializeApp(
+        options: kIsWeb ? DefaultFirebaseOptions.currentPlatform : null,
+      );
+      final apps = Firebase.apps;
+      if (apps.isEmpty) {
+        AppLogger.warning(
+          'Firebaseアプリリストが空です',
+          details:
+              '設定ファイルが不足している可能性があります:\n'
+              '- Web: --dart-define（CONFIGURE.md）\n'
+              '- Android: android/app/google-services.json\n'
+              '- iOS: ios/Runner/GoogleService-Info.plist',
+        );
+      } else {
+        AppLogger.success('Firebaseの初期化が完了しました', details: 'アプリ数: ${apps.length}');
+      }
     }
   } catch (e) {
     AppLogger.error('Firebaseの初期化に失敗しました', error: e,

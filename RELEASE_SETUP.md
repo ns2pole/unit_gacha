@@ -29,6 +29,11 @@ Key ID / Issuer ID / Apple ID は **yaml に既に記載**（`6756411322` = Unit
 
 その後: ワークフロー **ios-appstore-release** を実行。
 
+## 認証（Google / 電話）
+
+- **iOS:** `ios/Runner/Info.plist` に `GIDClientID` と URL scheme を直書き（joymath 同様）。`GoogleService-Info.plist` を変えたら Info.plist も手で更新。
+- **Android の Google:** `./scripts/print_android_sha1.sh` → Firebase に SHA-1 登録 → `google-services.json` 更新 → Codemagic Secret 更新（`CONFIGURE.md`）。
+
 ## ローカル fastlane（任意・Codemagic とは別）
 
 ```bash

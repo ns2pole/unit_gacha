@@ -1,5 +1,6 @@
 // Firebase options: no API keys in source control.
-// Pass values at build time with --dart-define (see CONFIGURE.md) or use FlutterFire CLI locally.
+// Web builds: pass values with --dart-define (see CONFIGURE.md).
+// iOS/Android: use google-services.json + GoogleService-Info.plist (joymath と同様、main は options: null)。
 // ignore_for_file: type=lint
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;

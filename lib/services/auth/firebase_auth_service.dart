@@ -10,10 +10,6 @@ import '../../util/platform_info.dart';
 /// Firebase認証サービス
 /// メール/パスワード、電話番号認証、Google認証、Apple Sign-Inをサポート
 class FirebaseAuthService {
-  static const String _iosGoogleClientId = String.fromEnvironment(
-    'FIREBASE_IOS_CLIENT_ID',
-    defaultValue: '',
-  );
   static const String _appleWebClientId = String.fromEnvironment(
     'FIREBASE_APPLE_WEB_CLIENT_ID',
     defaultValue: '',
@@ -127,64 +123,72 @@ class FirebaseAuthService {
 
   /// Google認証でログイン
   static Future<UserCredential?> signInWithGoogle() async {
+    if (!_isFirebaseInitialized) {
+      print('Error: Firebase not initialized');
+      return null;
+    }
+
+    return kIsWeb ? _signInWithGoogleOnWeb() : _signInWithGoogleOnNative();
+  }
+
+  static Future<UserCredential?> _signInWithGoogleOnWeb() async {
     try {
-      if (!_isFirebaseInitialized) {
-        print('Error: Firebase not initialized');
+      final provider = GoogleAuthProvider()
+        ..addScope('email')
+        ..addScope('profile')
+        ..setCustomParameters({'prompt': 'select_account'});
+
+      return await _auth.signInWithPopup(provider);
+    } on FirebaseAuthException catch (e) {
+      print('FirebaseAuthException signing in with Google on Web:');
+      print('  Code: ${e.code}');
+      print('  Message: ${e.message}');
+
+      if (e.code == 'popup-closed-by-user' ||
+          e.code == 'user-cancelled' ||
+          e.code == 'cancelled-popup-request') {
         return null;
       }
+      return null;
+    } catch (e, stackTrace) {
+      print('Error signing in with Google on Web: $e');
+      print('Stack trace: $stackTrace');
+      return null;
+    }
+  }
 
-      if (kIsWeb) {
-        final provider = GoogleAuthProvider()
-          ..addScope('email')
-          ..addScope('profile')
-          ..setCustomParameters({'prompt': 'select_account'});
-
-        final userCredential = await _auth.signInWithPopup(provider);
-        return userCredential;
-      }
-
-      // Google Sign-Inのインスタンスを作成
-      // iOSではclientIdを明示的に指定する必要がある
+  static Future<UserCredential?> _signInWithGoogleOnNative() async {
+    try {
+      // iOS: GIDClientID / REVERSED_CLIENT_ID は Info.plist + GoogleService-Info.plist
       final GoogleSignIn googleSignIn = GoogleSignIn(
         scopes: ['email', 'profile'],
-        clientId: PlatformInfo.isIOS && _iosGoogleClientId.isNotEmpty
-            ? _iosGoogleClientId
-            : null,
       );
 
-      // 既にサインインしている場合はサインアウト（再認証のため）
       await googleSignIn.signOut();
 
-      // Googleアカウントでサインイン
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-      
       if (googleUser == null) {
-        // ユーザーがサインインをキャンセルした
         print('Google Sign-In cancelled by user');
         return null;
       }
 
-      // 認証情報を取得
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
-      // Firebase認証用のクレデンシャルを作成
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      // 通常のサインイン
-      final userCredential = await _auth.signInWithCredential(credential);
-      return userCredential;
+      return await _auth.signInWithCredential(credential);
     } on FirebaseAuthException catch (e) {
       print('FirebaseAuthException signing in with Google:');
       print('  Code: ${e.code}');
       print('  Message: ${e.message}');
-      print('  Email: ${e.email}');
-      print('  Credential: ${e.credential}');
       return null;
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('Error signing in with Google: $e');
+      print('Stack trace: $stackTrace');
       return null;
     }
   }

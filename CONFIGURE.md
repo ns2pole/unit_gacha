@@ -10,24 +10,31 @@ Files matched by [`.gitignore`](.gitignore) (e.g. `google-services.json`, `Googl
 2. Place them at:
    - `android/app/google-services.json`
    - `ios/Runner/GoogleService-Info.plist`
-3. For `lib/firebase_options.dart`, pass `--dart-define` at build time (see below) or use your IDE’s “Additional run args”.
+3. **iOS（joymath 同様）:** `GoogleService-Info.plist` を差し替えたら `ios/Runner/Info.plist` も手で揃える:
+   - `GIDClientID` = plist の `CLIENT_ID`
+   - `CFBundleURLSchemes` の1つ目 = plist の `REVERSED_CLIENT_ID`
+   - 2つ目 = `GOOGLE_APP_ID`（`1:番号:ios:サフィックス`）から `app-1-番号-ios-サフィックス`
 
-## Dart defines (Firebase + RevenueCat)
+4. **Android Google ログイン:** リリース用 SHA-1 を Firebase に登録し `google-services.json` を再取得（下記「Android SHA-1」）。
 
-`lib/firebase_options.dart` reads Firebase settings from `String.fromEnvironment(...)`.
+`lib/firebase_options.dart` の `--dart-define` は **Web ビルドのみ** 必須。iOS/Android は joymath と同様 plist/json のみ。
+
+## Dart defines (Web Firebase + RevenueCat)
 
 Minimum defines for **web** (GitHub Pages CI):
 
 - `FIREBASE_WEB_API_KEY`, `FIREBASE_WEB_APP_ID`, `FIREBASE_MESSAGING_SENDER_ID`, `FIREBASE_PROJECT_ID`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_STORAGE_BUCKET`
 - Optional: `FIREBASE_MEASUREMENT_ID`
 
-**Android** additionally: `FIREBASE_ANDROID_API_KEY`, `FIREBASE_ANDROID_APP_ID`
-
-**iOS** additionally: `FIREBASE_IOS_API_KEY`, `FIREBASE_IOS_APP_ID`, `FIREBASE_IOS_CLIENT_ID`, `FIREBASE_IOS_BUNDLE_ID`
-
-**Google Sign-In (iOS)** uses `FIREBASE_IOS_CLIENT_ID` (same as `CLIENT_ID` in `GoogleService-Info.plist`).
-
 **Apple Sign-In (Android)** needs `FIREBASE_APPLE_WEB_CLIENT_ID` and `FIREBASE_AUTH_HANDLER_URL` (typically `https://<project-id>.firebaseapp.com/__/auth/handler`).
+
+## Android SHA-1（Google ログインが Android で落ちる場合）
+
+```bash
+./scripts/print_android_sha1.sh
+```
+
+表示された SHA-1 を Firebase Console → **unitgacha** → Android アプリ → **フィンガープリントを追加** に登録し、`google-services.json` を再ダウンロードして `android/app/` と Codemagic の `GOOGLE_SERVICES_JSON` を更新する。
 
 **RevenueCat** (mobile only; web skips SDK):
 

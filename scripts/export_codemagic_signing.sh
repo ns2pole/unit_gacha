@@ -7,8 +7,30 @@ OUT="$ROOT/codemagic-signing"
 mkdir -p "$OUT"
 
 echo "==> Provisioning profile (com.joyphysics.unitgacha App Store)"
-if [[ -f "$OUT/com.joyphysics.unitgacha.appstore.mobileprovision" ]]; then
-  echo "    既にあります: $OUT/com.joyphysics.unitgacha.appstore.mobileprovision"
+PROV_OUT="$OUT/com.joyphysics.unitgacha.appstore.mobileprovision"
+XCODE_PROV_DIR="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+if [[ -f "$PROV_OUT" ]]; then
+  echo "    既にあります: $PROV_OUT"
+elif [[ -d "$XCODE_PROV_DIR" ]]; then
+  found=""
+  for f in "$XCODE_PROV_DIR"/*.mobileprovision; do
+    [[ -f "$f" ]] || continue
+    decoded=$(security cms -D -i "$f" 2>/dev/null || true)
+    # App Store 配布用: bundle 一致かつ ProvisionedDevices なし（Store プロファイル）
+    if echo "$decoded" | grep -q '7K99YVR868.com.joyphysics.unitgacha' \
+      && ! echo "$decoded" | grep -q '<key>ProvisionedDevices</key>'; then
+      found="$f"
+      break
+    fi
+  done
+  if [[ -n "$found" ]]; then
+    cp "$found" "$PROV_OUT"
+    echo "    Xcode からコピー: $PROV_OUT"
+    echo "    元: $found"
+  else
+    echo "    App Store 用プロファイルが Xcode に見つかりません。"
+    echo "    developer.apple.com から DL して $PROV_OUT に置いてください。"
+  fi
 else
   echo "    無い場合は App Store Connect API または developer.apple.com から DL"
 fi
