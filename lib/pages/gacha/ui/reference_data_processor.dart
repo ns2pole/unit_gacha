@@ -28,10 +28,10 @@ class ReferenceDataProcessor {
       case ReferenceCategory.thermodynamics:
         return data!.quantities.where((q) => q.no >= 34 && q.no <= 39).toList();
       case ReferenceCategory.electromagnetism:
-        return data!.quantities.where((q) => q.no >= 41 && q.no <= 63).toList();
+        return data!.quantities.where((q) => q.no >= 41 && q.no <= 59).toList();
       case ReferenceCategory.atom:
-        // 原子物理の物理量はNo. 64以降とする（将来用）
-        return data!.quantities.where((q) => q.no >= 64).toList();
+        // 仕事関数（No. 60）以降は原子物理
+        return data!.quantities.where((q) => q.no >= 60).toList();
     }
   }
   
@@ -46,10 +46,10 @@ class ReferenceDataProcessor {
       case ReferenceCategory.thermodynamics:
         return data!.constants.where((c) => c.no >= 3 && c.no <= 9).toList();
       case ReferenceCategory.electromagnetism:
-        return data!.constants.where((c) => c.no >= 12 && c.no <= 25).toList();
+        return data!.constants.where((c) => c.no >= 12 && c.no <= 15).toList();
       case ReferenceCategory.atom:
-        // 原子物理の定数はNo. 26以降とする（将来用）
-        return data!.constants.where((c) => c.no >= 26).toList();
+        // 電子の比電荷（No. 16）以降は原子物理
+        return data!.constants.where((c) => c.no >= 16).toList();
     }
   }
   
@@ -95,7 +95,7 @@ class ReferenceDataProcessor {
       case ReferenceCategory.electromagnetism:
         return isEnglish ? 'Electromagnetism' : '電磁気学';
       case ReferenceCategory.atom:
-        return isEnglish ? 'Atom' : '原子物理';
+        return isEnglish ? 'Atom' : '原子';
     }
   }
 }

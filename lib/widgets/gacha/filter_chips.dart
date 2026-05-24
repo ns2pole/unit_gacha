@@ -153,7 +153,6 @@ class BlueFilterChip extends StatelessWidget {
   final double iconSize;
   final Widget? statusBadge; // ステータスバッジ（オプション）
   final String? additionalText; // 追加テキスト（例: "ならガチャから外す"）
-  final bool showProblemCountOnSecondLine; // 問題数を2行目に表示するか
 
   const BlueFilterChip({
     super.key,
@@ -164,7 +163,6 @@ class BlueFilterChip extends StatelessWidget {
     this.iconSize = 26,
     this.statusBadge,
     this.additionalText,
-    this.showProblemCountOnSecondLine = false,
   });
 
   @override
@@ -199,52 +197,51 @@ class BlueFilterChip extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1行目: Filter Settings
+            // 1行目: フィルタ設定 + 残り問題数
             Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.filter_list,
+                        color: Colors.blue[700],
+                        size: iconSize,
+                      ),
                     ),
-                    child: Icon(
-                      Icons.filter_list,
-                      color: Colors.blue[700],
-                      size: iconSize,
+                    const SizedBox(width: 12),
+                    Text(
+                      AppLocalizations.of(context).filterSettings,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue[700],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    AppLocalizations.of(context).filterSettings,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue[700],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // 2行目: remaining (problemCountText)
-            if (problemCountText != null) ...[
-              const SizedBox(height: 8),
-              Center(
-                child: Text(
-                  problemCountText!,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue[700],
-                  ),
-                  textAlign: TextAlign.center,
+                    if (problemCountText != null) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        problemCountText!,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue[700],
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-            ],
-            // 3行目: latest (filterLabel + statusBadge + additionalText)
+            ),
+            // 2行目: latest (filterLabel + statusBadge + additionalText)
             const SizedBox(height: 8),
             Center(
               child: Row(
@@ -654,7 +651,6 @@ class _GachaExclusionFilterWidgetState extends State<GachaExclusionFilterWidget>
       problemCountText: widget.problemCountText,
       statusBadge: statusBadge,
       additionalText: additionalText,
-      showProblemCountOnSecondLine: widget.gachaFilterMode == GachaFilterMode.random,
     );
   }
 }

@@ -27,7 +27,7 @@ class AppLocalizations {
       'categoryElectromagnetism': '電磁気学',
       'categoryThermodynamics': '熱力学',
       'categoryWaves': '波動',
-      'categoryAtom': '原子物理',
+      'categoryAtom': '原子',
       'problemDetailTitle': '問題詳細',
       'historyTitle': '学習履歴',
       'historyClear': '履歴クリア',
@@ -86,7 +86,11 @@ class AppLocalizations {
       'categoryLabelThermodynamics': '熱力学',
       'categoryLabelWaves': '波動',
       'categoryLabelElectromagnetism': '電磁気学',
-      'categoryLabelAtom': '原子物理',
+      'categoryLabelAtom': '原子',
+      'referenceSectionPhysicalConstants': '物理定数',
+      'referenceSectionPhysicalQuantities': '物理量',
+      'referenceCategoryNoData': 'このカテゴリにはデータがありません。',
+      'referenceLoadDataFailed': 'データの読み込みに失敗しました: {error}',
       'pointHeader': '【ポイント】',
       'next': '次へ',
       'complete': '完了',
@@ -122,7 +126,7 @@ class AppLocalizations {
       'fingerDrawing': '指で描画',
       'selectColor': '色を選択',
       'gachaSettings': 'ガチャ設定',
-      'filterSettings': 'フィルタリング設定',
+      'filterSettings': 'フィルタ設定',
       'filterModeRandom': '完全ランダム（除外なし）',
       'filterModeExcludeSolved': '解決済みの問題を除く',
       'filterModeLatest1': '最新1回が',
@@ -346,9 +350,9 @@ class AppLocalizations {
       'gachaCorrect': 'Correct!',
       'gachaIncorrect': 'Try again',
       'gachaHistorySaved': 'History saved',
-      'filterNoExclusion': 'No exclusion: total {count}',
-      'totalCountOnly': 'Total {count}',
-      'filterRemaining': '(Remaining {filtered}/{total})',
+      'filterNoExclusion': 'No exclusion: all {count} problems',
+      'totalCountOnly': 'All {count} problems',
+      'filterRemaining': '(Remaining {filtered}/{total} problems)',
       'filterAdditional': 'Exclude in gacha',
       'menuLatest1': 'Aggregate latest 1 only',
       'menuLatest3': 'Aggregate latest 3',
@@ -390,6 +394,10 @@ class AppLocalizations {
       'categoryLabelWaves': 'Waves',
       'categoryLabelElectromagnetism': 'Electromagnetism',
       'categoryLabelAtom': 'Atom',
+      'referenceSectionPhysicalConstants': 'Physical Constants',
+      'referenceSectionPhysicalQuantities': 'Physical Quantities',
+      'referenceCategoryNoData': 'No data available for this category.',
+      'referenceLoadDataFailed': 'Failed to load data: {error}',
       'pointHeader': '[Point]',
       'next': 'Next',
       'complete': 'Complete',
@@ -426,7 +434,7 @@ class AppLocalizations {
       'fingerDrawing': 'Finger Drawing',
       'selectColor': 'Select Color',
       'gachaSettings': 'Gacha Settings',
-      'filterSettings': 'Filter Settings',
+      'filterSettings': 'Filter settings',
       'filterModeRandom': 'Random (No Exclusion)',
       'filterModeExcludeSolved': 'Exclude Solved',
       'filterModeLatest1': 'Latest 1',
@@ -755,6 +763,13 @@ class AppLocalizations {
   String get categoryLabelWaves => _value('categoryLabelWaves');
   String get categoryLabelElectromagnetism => _value('categoryLabelElectromagnetism');
   String get categoryLabelAtom => _value('categoryLabelAtom');
+  String get referenceSectionPhysicalConstants =>
+      _value('referenceSectionPhysicalConstants');
+  String get referenceSectionPhysicalQuantities =>
+      _value('referenceSectionPhysicalQuantities');
+  String get referenceCategoryNoData => _value('referenceCategoryNoData');
+  String referenceLoadDataFailed(String error) =>
+      _value('referenceLoadDataFailed').replaceAll('{error}', error);
   String get pointHeader => _value('pointHeader');
   String get unitLabel => _value('unitLabel');
   String get unitGachaTypeName => _value('unitGachaTypeName');

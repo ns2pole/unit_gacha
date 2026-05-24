@@ -113,9 +113,10 @@ class ReferenceTableBuilder {
     final columnWidths = _isEnglish
         ? const {
             0: FixedColumnWidth(50),
-            1: FixedColumnWidth(120),
-            2: FixedColumnWidth(180),
-            3: FixedColumnWidth(200),
+            1: FixedColumnWidth(200),
+            2: FixedColumnWidth(120),
+            3: FixedColumnWidth(180),
+            4: FixedColumnWidth(200),
           }
         : const {
             0: FixedColumnWidth(50),
@@ -141,6 +142,7 @@ class ReferenceTableBuilder {
                   children: _isEnglish
                       ? [
                           _TableHeaderCell('No.', fontSize: _headerFontSize),
+                          _TableHeaderCell('Name', fontSize: _headerFontSize),
                           _TableHeaderCell('Symbol', fontSize: _headerFontSize),
                           _TableHeaderCell('Approx Value', fontSize: _headerFontSize),
                           _TableHeaderCell('Exact Value', fontSize: _headerFontSize),
@@ -164,6 +166,7 @@ class ReferenceTableBuilder {
                     children: _isEnglish
                         ? [
                             _TableCell(constant.no.toString(), fontSize: _cellFontSize, mathFontSize: _mathFontSize),
+                            _TableCell(constant.en, fontSize: _cellFontSize, mathFontSize: _mathFontSize),
                             _TableCell(constant.symbol, fontSize: _cellFontSize, mathFontSize: _mathFontSize),
                             _TableCell(constant.approxValue, fontSize: _cellFontSize, mathFontSize: _mathFontSize),
                             _TableCell(constant.exactValue, fontSize: _cellFontSize, mathFontSize: _mathFontSize),

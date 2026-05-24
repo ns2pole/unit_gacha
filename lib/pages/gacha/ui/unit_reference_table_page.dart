@@ -120,15 +120,19 @@ class _UnitReferenceTablePageState extends State<UnitReferenceTablePage>
         _isLoading = false;
       });
     } catch (e) {
-      final isEnglish = AppLocale.isEnglish(context);
+      final l10n = AppLocalizations.of(context);
       setState(() {
-        _errorMessage = isEnglish ? 'Failed to load data: $e' : 'データの読み込みに失敗しました: $e';
+        _errorMessage = l10n.referenceLoadDataFailed(e.toString());
         _isLoading = false;
       });
     }
   }
 
-  Widget _buildCategoryContent(ReferenceCategory category, bool isEnglish) {
+  Widget _buildCategoryContent(
+    ReferenceCategory category,
+    bool isEnglish,
+    AppLocalizations l10n,
+  ) {
     if (_data == null || _processor == null) {
       return const Center(
         child: Padding(
@@ -147,7 +151,7 @@ class _UnitReferenceTablePageState extends State<UnitReferenceTablePage>
         child: Padding(
           padding: const EdgeInsets.all(32.0),
           child: Text(
-            isEnglish ? 'No data available for this category.' : 'このカテゴリにはデータがありません。',
+            l10n.referenceCategoryNoData,
             style: const TextStyle(
               fontSize: 16,
               color: Colors.grey,
@@ -163,27 +167,11 @@ class _UnitReferenceTablePageState extends State<UnitReferenceTablePage>
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (quantities.isNotEmpty) ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                isEnglish ? 'Physical Quantities' : '物理量',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF8B7355),
-                ),
-              ),
-            ),
-            tableBuilder.buildQuantitiesTable(quantities, category),
-          ],
-          if (quantities.isNotEmpty && constants.isNotEmpty) const SizedBox(height: 24),
           if (constants.isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Text(
-                isEnglish ? 'Constants' : '定数',
+                l10n.referenceSectionPhysicalConstants,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 20,
@@ -193,6 +181,22 @@ class _UnitReferenceTablePageState extends State<UnitReferenceTablePage>
               ),
             ),
             tableBuilder.buildConstantsTable(constants, category),
+          ],
+          if (constants.isNotEmpty && quantities.isNotEmpty) const SizedBox(height: 24),
+          if (quantities.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                l10n.referenceSectionPhysicalQuantities,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF8B7355),
+                ),
+              ),
+            ),
+            tableBuilder.buildQuantitiesTable(quantities, category),
           ],
           const SizedBox(height: 16),
         ],
@@ -256,7 +260,7 @@ class _UnitReferenceTablePageState extends State<UnitReferenceTablePage>
                   }),
                   isDataAnalysisActive: widget.isDataAnalysisActive,
                   // カテゴリ選択をフィルタリングガジェットと同じ方法で表示
-                  filterSettingsPanel: _isCategoryLoaded ? _buildCategorySelectorPanel(isEnglish: isEnglish) : null,
+                  filterSettingsPanel: _isCategoryLoaded ? _buildCategorySelectorPanel() : null,
                   showFilterPanel: _isCategoryLoaded,
                 ),
               ),
@@ -278,7 +282,7 @@ class _UnitReferenceTablePageState extends State<UnitReferenceTablePage>
                         ),
                       )
                     else if (_data != null && _processor != null)
-                      _buildCategoryContent(_selectedCategory, isEnglish),
+                      _buildCategoryContent(_selectedCategory, isEnglish, locale),
                   ],
                 ),
               ),
@@ -359,9 +363,7 @@ class _UnitReferenceTablePageState extends State<UnitReferenceTablePage>
     );
   }
 
-  Widget _buildCategorySelectorPanel({required bool isEnglish}) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenWidth < 400;
+  Widget _buildCategorySelectorPanel() {
     final l10n = AppLocalizations.of(context);
 
     void onSelect(ReferenceCategory category) {
@@ -372,8 +374,17 @@ class _UnitReferenceTablePageState extends State<UnitReferenceTablePage>
       _saveSelectedCategory(category);
     }
 
-    Widget buildRow(List<ReferenceCategory> categories) {
-      return SingleChildScrollView(
+    const categories = [
+      ReferenceCategory.mechanics,
+      ReferenceCategory.thermodynamics,
+      ReferenceCategory.waves,
+      ReferenceCategory.electromagnetism,
+      ReferenceCategory.atom,
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -389,31 +400,6 @@ class _UnitReferenceTablePageState extends State<UnitReferenceTablePage>
             ],
           ],
         ),
-      );
-    }
-
-    // フィルタリングガジェットと同じ形式で返す
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          if (isSmallScreen) ...[
-            // 小さい画面の場合: 2段レイアウト
-            buildRow(const [ReferenceCategory.mechanics, ReferenceCategory.thermodynamics]),
-            const SizedBox(height: 8),
-            buildRow(const [ReferenceCategory.waves, ReferenceCategory.electromagnetism, ReferenceCategory.atom]),
-          ] else ...[
-            // 大きい画面の場合: 1段レイアウト
-            buildRow(const [
-              ReferenceCategory.mechanics,
-              ReferenceCategory.thermodynamics,
-              ReferenceCategory.waves,
-              ReferenceCategory.electromagnetism,
-              ReferenceCategory.atom,
-            ]),
-          ],
-        ],
       ),
     );
   }

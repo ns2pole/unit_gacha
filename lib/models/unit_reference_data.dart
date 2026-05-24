@@ -92,6 +92,7 @@ class Quantity {
 class Constant {
   final int no;
   final String jp;
+  final String en;
   final String symbol;
   final String approxValue;
   final String exactValue;
@@ -99,6 +100,7 @@ class Constant {
   Constant({
     required this.no,
     required this.jp,
+    required this.en,
     required this.symbol,
     required this.approxValue,
     required this.exactValue,
@@ -108,6 +110,7 @@ class Constant {
     return Constant(
       no: json['no'] as int,
       jp: json['jp'] as String,
+      en: json['en'] as String? ?? json['jp'] as String,
       symbol: json['symbol'] as String? ?? '',
       approxValue: json['approx_value'] as String? ?? '',
       exactValue: json['exact_value'] as String? ?? '',

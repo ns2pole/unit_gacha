@@ -4,7 +4,7 @@
       "fields": ["no", "jp", "en", "unit_symbol", "unit_name", "unit_name_en", "main_quantity_symbols", "unit_relations"]
     },
     "constants": {
-      "fields": ["no", "jp", "symbol", "approx_value", "exact_value"]
+      "fields": ["no", "jp", "en", "symbol", "approx_value", "exact_value"]
     }
   },
   "quantities": [
@@ -73,31 +73,31 @@
     {"no":63,"jp":"等価線量","en":"equivalent dose","unit_symbol":"Sv","unit_name":"シーベルト","unit_name_en":"sievert","main_quantity_symbols":[],"unit_relations":["1 Sv = 係数 × Gy"]}
   ],
   "constants": [
-    {"no":1,"jp":"重力加速度（標準）","symbol":"g","approx_value":"9.8 m/s^2","exact_value":"9.80665 m/s^2"},
-    {"no":2,"jp":"万有引力定数","symbol":"G","approx_value":"6.67×10^-11 N·m^2/kg^2","exact_value":"6.67408×10^-11 N·m^2/kg^2"},
-    {"no":3,"jp":"絶対零度（0 K）","symbol":"","approx_value":"−273 ℃","exact_value":"−273.15 ℃"},
-    {"no":4,"jp":"熱の仕事当量","symbol":"J","approx_value":"4.2 J/cal","exact_value":"4.18580 J/cal"},
-    {"no":5,"jp":"アボガドロ定数","symbol":"N_A","approx_value":"6.02×10^23 /mol","exact_value":"6.02214076×10^23 /mol"},
-    {"no":6,"jp":"標準大気圧（1 気圧）","symbol":"p0","approx_value":"1.013×10^5 Pa","exact_value":"1.01325×10^5 Pa"},
-    {"no":7,"jp":"理想気体 1 mol の体積（0 ℃・1 気圧）","symbol":"V0","approx_value":"2.24×10^-2 m^3","exact_value":"2.2413962×10^-2 m^3"},
-    {"no":8,"jp":"気体定数","symbol":"R (= kN_A)","approx_value":"8.31 J/(mol·K)","exact_value":"8.314462618… J/(mol·K)"},
-    {"no":9,"jp":"ボルツマン定数","symbol":"k","approx_value":"1.38×10^-23 J/K","exact_value":"1.380649×10^-23 J/K"},
-    {"no":10,"jp":"乾燥空気中の音速（0 ℃・1 気圧）","symbol":"v","approx_value":"331.5 m/s","exact_value":"3.3145×10^2 m/s"},
-    {"no":11,"jp":"真空中の光速","symbol":"c","approx_value":"3.0×10^8 m/s","exact_value":"2.99792458×10^8 m/s"},
-    {"no":12,"jp":"電気力に関するクーロンの法則の比例定数（真空）","symbol":"k0 (= 1/4πϵ0)","approx_value":"9.0×10^9 N·m^2/C^2","exact_value":"8.987…×10^9 N·m^2/C^2"},
-    {"no":13,"jp":"真空の誘電率","symbol":"ϵ0 (= 1/μ0c^2)","approx_value":"8.85×10^-12 F/m","exact_value":"8.854187817…×10^-12 F/m"},
-    {"no":14,"jp":"磁気力に関するクーロンの法則の比例定数（真空）","symbol":"km (= 1/4πμ0)","approx_value":"6.33×10^4 N·m^2/Wb^2","exact_value":"6.332…×10^4 N·m^2/Wb^2"},
-    {"no":15,"jp":"真空の透磁率","symbol":"μ0","approx_value":"1.26×10^-6 N/A^2","exact_value":"1.25663706212×10^-6 N/A^2"},
-    {"no":16,"jp":"電子の比電荷","symbol":"e/me","approx_value":"1.76×10^11 C/kg","exact_value":"1.75882001076×10^11 C/kg"},
-    {"no":17,"jp":"電子の質量","symbol":"me","approx_value":"9.11×10^-31 kg","exact_value":"9.1093837015×10^-31 kg（5.4857990906×10^-4 u）"},
-    {"no":18,"jp":"電気素量","symbol":"e","approx_value":"1.60×10^-19 C","exact_value":"1.602176634×10^-19 C"},
-    {"no":19,"jp":"プランク定数","symbol":"h","approx_value":"6.63×10^-34 J·s","exact_value":"6.62607015×10^-34 J·s"},
-    {"no":20,"jp":"電子ボルト","symbol":"","approx_value":"1.60×10^-19 J","exact_value":"1 eV = 1.602176634×10^-19 J"},
-    {"no":21,"jp":"リュードベリ定数","symbol":"R","approx_value":"1.097×10^7 /m","exact_value":"1.0973731568508×10^7 /m"},
-    {"no":22,"jp":"ボーア半径","symbol":"a0","approx_value":"5.29×10^-11 m","exact_value":"5.2917721067×10^-11 m"},
-    {"no":23,"jp":"統一原子質量単位","symbol":"u","approx_value":"1.661×10^-27 kg","exact_value":"1 u = 1.660539066×10^-27 kg"},
-    {"no":24,"jp":"陽子の質量","symbol":"mp","approx_value":"1.67×10^-27 kg","exact_value":"1.67262192369×10^-27 kg（1.007276466621 u）"},
-    {"no":25,"jp":"中性子の質量","symbol":"mn","approx_value":"1.67×10^-27 kg","exact_value":"1.67492749804×10^-27 kg（1.00866491595 u）"}
+    {"no":1,"jp":"重力加速度（標準）","en":"standard gravitational acceleration","symbol":"g","approx_value":"9.8 m/s^2","exact_value":"9.80665 m/s^2"},
+    {"no":2,"jp":"万有引力定数","en":"gravitational constant","symbol":"G","approx_value":"6.67×10^-11 N·m^2/kg^2","exact_value":"6.67408×10^-11 N·m^2/kg^2"},
+    {"no":3,"jp":"絶対零度（0 K）","en":"absolute zero (0 K)","symbol":"","approx_value":"−273 ℃","exact_value":"−273.15 ℃"},
+    {"no":4,"jp":"熱の仕事当量","en":"mechanical equivalent of heat","symbol":"J","approx_value":"4.2 J/cal","exact_value":"4.18580 J/cal"},
+    {"no":5,"jp":"アボガドロ定数","en":"Avogadro constant","symbol":"N_A","approx_value":"6.02×10^23 /mol","exact_value":"6.02214076×10^23 /mol"},
+    {"no":6,"jp":"標準大気圧（1 気圧）","en":"standard atmospheric pressure (1 atm)","symbol":"p0","approx_value":"1.013×10^5 Pa","exact_value":"1.01325×10^5 Pa"},
+    {"no":7,"jp":"理想気体 1 mol の体積（0 ℃・1 気圧）","en":"molar volume of ideal gas (0 °C, 1 atm)","symbol":"V0","approx_value":"2.24×10^-2 m^3","exact_value":"2.2413962×10^-2 m^3"},
+    {"no":8,"jp":"気体定数","en":"gas constant","symbol":"R (= kN_A)","approx_value":"8.31 J/(mol·K)","exact_value":"8.314462618… J/(mol·K)"},
+    {"no":9,"jp":"ボルツマン定数","en":"Boltzmann constant","symbol":"k","approx_value":"1.38×10^-23 J/K","exact_value":"1.380649×10^-23 J/K"},
+    {"no":10,"jp":"乾燥空気中の音速（0 ℃・1 気圧）","en":"speed of sound in dry air (0 °C, 1 atm)","symbol":"v","approx_value":"331.5 m/s","exact_value":"3.3145×10^2 m/s"},
+    {"no":11,"jp":"真空中の光速","en":"speed of light in vacuum","symbol":"c","approx_value":"3.0×10^8 m/s","exact_value":"2.99792458×10^8 m/s"},
+    {"no":12,"jp":"電気力に関するクーロンの法則の比例定数（真空）","en":"Coulomb constant (vacuum)","symbol":"k0 (= 1/4πϵ0)","approx_value":"9.0×10^9 N·m^2/C^2","exact_value":"8.987…×10^9 N·m^2/C^2"},
+    {"no":13,"jp":"真空の誘電率","en":"vacuum permittivity","symbol":"ϵ0 (= 1/μ0c^2)","approx_value":"8.85×10^-12 F/m","exact_value":"8.854187817…×10^-12 F/m"},
+    {"no":14,"jp":"磁気力に関するクーロンの法則の比例定数（真空）","en":"magnetic Coulomb constant (vacuum)","symbol":"km (= 1/4πμ0)","approx_value":"6.33×10^4 N·m^2/Wb^2","exact_value":"6.332…×10^4 N·m^2/Wb^2"},
+    {"no":15,"jp":"真空の透磁率","en":"vacuum permeability","symbol":"μ0","approx_value":"1.26×10^-6 N/A^2","exact_value":"1.25663706212×10^-6 N/A^2"},
+    {"no":16,"jp":"電子の比電荷","en":"specific charge of electron","symbol":"e/me","approx_value":"1.76×10^11 C/kg","exact_value":"1.75882001076×10^11 C/kg"},
+    {"no":17,"jp":"電子の質量","en":"mass of electron","symbol":"me","approx_value":"9.11×10^-31 kg","exact_value":"9.1093837015×10^-31 kg（5.4857990906×10^-4 u）"},
+    {"no":18,"jp":"電気素量","en":"elementary charge","symbol":"e","approx_value":"1.60×10^-19 C","exact_value":"1.602176634×10^-19 C"},
+    {"no":19,"jp":"プランク定数","en":"Planck constant","symbol":"h","approx_value":"6.63×10^-34 J·s","exact_value":"6.62607015×10^-34 J·s"},
+    {"no":20,"jp":"電子ボルト","en":"electron volt","symbol":"","approx_value":"1.60×10^-19 J","exact_value":"1 eV = 1.602176634×10^-19 J"},
+    {"no":21,"jp":"リュードベリ定数","en":"Rydberg constant","symbol":"R","approx_value":"1.097×10^7 /m","exact_value":"1.0973731568508×10^7 /m"},
+    {"no":22,"jp":"ボーア半径","en":"Bohr radius","symbol":"a0","approx_value":"5.29×10^-11 m","exact_value":"5.2917721067×10^-11 m"},
+    {"no":23,"jp":"統一原子質量単位","en":"unified atomic mass unit","symbol":"u","approx_value":"1.661×10^-27 kg","exact_value":"1 u = 1.660539066×10^-27 kg"},
+    {"no":24,"jp":"陽子の質量","en":"mass of proton","symbol":"mp","approx_value":"1.67×10^-27 kg","exact_value":"1.67262192369×10^-27 kg（1.007276466621 u）"},
+    {"no":25,"jp":"中性子の質量","en":"mass of neutron","symbol":"mn","approx_value":"1.67×10^-27 kg","exact_value":"1.67492749804×10^-27 kg（1.00866491595 u）"}
   ]
 }
 

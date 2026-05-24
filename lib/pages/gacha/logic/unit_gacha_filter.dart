@@ -172,15 +172,11 @@ class UnitGachaFilterHelper {
   }) {
     return Builder(
       builder: (context) {
-        final screenWidth = MediaQuery.of(context).size.width;
-        final isSmallScreen = screenWidth < 400; // 画面幅が400px未満の場合は2段レイアウト
-
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 1段目: mechanics, thermodynamics, waves
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
@@ -204,16 +200,7 @@ class UnitGachaFilterHelper {
                       selectedCategories: selectedCategories,
                       onTap: () => onCategoryToggled(UnitCategory.waves),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              // 2段目: electromagnetism, atom
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
+                    const SizedBox(width: 8),
                     buildCategorySelector(
                       category: UnitCategory.electromagnetism,
                       selectedCategories: selectedCategories,
